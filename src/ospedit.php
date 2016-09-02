@@ -25,7 +25,7 @@ SOFTWARE.
 header('Content-Type: text/html; charset=UTF-8');
 header("X-XSS-Protection: 0");
 
-$url_script = "http".(!empty($_SERVER['HTTPS'])?"s":"")."://".$_SERVER['SERVER_NAME'].$_SERVER['REQUEST_URI'];
+$url_script = "http".(!empty($_SERVER['HTTPS'])?"s":"")."://".$_SERVER['SERVER_NAME'].":".$_SERVER['SERVER_PORT'].$_SERVER['REQUEST_URI'];
 
 $password='';
 if(isset($_POST['password']))
@@ -37,11 +37,11 @@ if ($password != "###_YOUR_PASSWORD_HERE_###")
 {
 ?>
 <center>
-  <form method="POST">
-  Please enter your password : <BR>
-    <input type="password" name="password" autofocus>
-    <input type="submit" value="connect">
-  </form>
+	<form method="POST">
+	Please enter your password : <BR>
+		<input type="password" name="password" autofocus>
+		<input type="submit" value="connect">
+	</form>
 </center>
 <?php
 	exit(0);
@@ -53,13 +53,42 @@ if(isset($_POST['file']))
 else if(isset($_GET['file']))
 	$file = htmlspecialchars($_GET['file']);
 
+$content='';
+if (strlen(trim($file)) > 0 && @file_exists($file))
+{
+	$opts = array('http' => array('header' => 'Accept-Charset: UTF-8, *;q=0'));
+	$context = stream_context_create($opts);
+	$content = file_get_contents($file, false, $context);
+}
+
 $operation='';
 if(isset($_POST['operation']))
 	$operation = htmlspecialchars($_POST['operation']);
 else if(isset($_GET['operation']))
 	$operation = htmlspecialchars($_GET['operation']);
 
-if ($operation=="backup")
+
+if ($operation=="load")
+{
+	echo $content;
+	exit(0);
+}
+else if ($operation=="save")
+{
+	if (true/*file_exists($file)*/)
+	{
+    if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
+    {
+    	$content = $_POST['content'];
+    	if (file_put_contents($file, htmlspecialchars_decode($content)))
+        echo "ok: file saved.";
+    }
+	}
+  else
+		echo "error: ".$file." doesn't exists";
+	exit(0);
+}
+else if ($operation=="backup")
 {
 	$today =getdate();
 	if (is_file($file))
@@ -86,11 +115,11 @@ else if ($operation=="delete")
 }
 else if ($operation=="rename")
 {
-    $oldfile='';
-    if(isset($_POST['oldfile']))
-    	$oldfile = htmlspecialchars($_POST['oldfile']);
-    else if(isset($_GET['file']))
-    	$oldfile = htmlspecialchars($_GET['oldfile']);
+		$oldfile='';
+		if(isset($_POST['oldfile']))
+			$oldfile = htmlspecialchars($_POST['oldfile']);
+		else if(isset($_GET['file']))
+			$oldfile = htmlspecialchars($_GET['oldfile']);
 	if (!is_file($oldfile))
 		echo "error: ".$oldfile." doesn't exists";
 	if (is_file($file))
@@ -167,26 +196,6 @@ if (strlen(trim($searchterm))>0)
 	exit(0);
 }
 
-$content='';
-if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
-{
-	$content = $_POST['content'];
-	if (strlen($file) > 0)
-		file_put_contents($file, htmlspecialchars_decode($content));
-}
-if (file_exists($file))
-{
-	$opts = array('http' => array('header' => 'Accept-Charset: UTF-8, *;q=0'));
-	$context = stream_context_create($opts);
-    $content = file_get_contents($file, false, $context);
-	$newfile = FALSE;
-	//echo $content;
-//$content = utf8_decode($content);
- //$content = iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $content);
-}
-else if (strlen(trim($file))>0)
-	$newfile = TRUE;
-
 $disableedit='0';
 if(isset($_POST['disableedit']))
 	$disableedit = htmlspecialchars($_POST['disableedit']);
@@ -194,11 +203,6 @@ else if(isset($_GET['disableedit']))
 	$disableedit = htmlspecialchars($_GET['disableedit']);
 $disableedit = $disableedit=='1'?TRUE:FALSE;
 
-$curpos='0,0';
-if(isset($_POST['curpos']))
-	$curpos = htmlspecialchars($_POST['curpos']);
-else if(isset($_GET['curpos']))
-	$curpos = htmlspecialchars($_GET['curpos']);
 ?>
 
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
@@ -213,7 +217,7 @@ else if(isset($_GET['curpos']))
 		<script type="text/javascript">
 		var editor = null;
 		var disableedit = <?php echo $disableedit==TRUE?"true":"false";?>;
-		//var newfile = <?php echo $newfile==TRUE?"true":"false";?>;
+		var url_script = "<?php echo $url_script;?>";
 		var types_ext = {
 			"javascript" : ["js"],
 			"html" : ["htm","html"],
@@ -232,23 +236,13 @@ else if(isset($_GET['curpos']))
 				var filext=filename.substring(filename.lastIndexOf(".")+1, filename.length);
 				filext=filext.toLowerCase();
 				editor.session.setMode("ace/mode/" + getModeFromExt(filext));
-				var carretpos = $("#curpos").val().split(",");
-				if (carretpos.length == 2)
-				{
-				    carretpos[0] = parseInt(carretpos[0])+1;
-				    carretpos[1] = parseInt(carretpos[1]);
-				    editor.resize(true)
-    				editor.scrollToLine(carretpos[0], true, true, function () {});
-    				editor.gotoLine(carretpos[0], carretpos[1], true);
-    				editor.focus();
-				}
 			}
 			else
 				document.getElementById('editor').style.display = 'none';
 			initcatcomplete();
 			$( "#file" ).catcomplete({
 				source: function (request, response) {
-					$.post("<?php echo $url_script;?>", {password: $("#password").val(), term: request.term}, response, "json");
+					$.post(url_script, {password: $("#password").val(), term: request.term}, response, "json");
 				},
 				delay: 0,//minLength: 2,
 				select: function( event, ui ) {
@@ -296,24 +290,6 @@ else if(isset($_GET['curpos']))
 				}
 			});
 		}
-		function onsavecode()
-		{
-			if (!disableedit)
-			{
-				$('#content').val(editor.getSession().getValue());
-				var row = editor.selection.getCursor().row;
-				var column = editor.selection.getCursor().column;
-				$('#curpos').val(row+","+column);
-				//alert(document.getElementById('content').value);
-			}
-			// if the filename is different from original we empty the content to prevent wipe of file
-			if ($('#file').val() != "<?php echo $file;?>")
-			{
-				$('#content').val("");
-				$('#curpos').val("0,0");
-			}
-			return true;
-		}
 		function is_touch_device()
 		{
 			try
@@ -322,15 +298,42 @@ else if(isset($_GET['curpos']))
 				return true;
 			} catch (e) { return false; }
 		}
-		function dobackup()
+		var current_file = "";
+		function doload()
 		{
-			$("#oper").val("1");
-			//$url_script
-			//alert("<?php echo $url_script;?>?backup=1&file="+$("#file").val());
 			var filename = $("#file").val();
 			if ($.trim(filename).length <= 0)
 				return false;
-			$.post( "<?php echo $url_script;?>",
+			$.post( url_script,
+				{ password: $("#password").val(), operation: "load", file: $("#file").val() },
+				function( data )
+				{
+					current_file = $("#file").val();
+					if (!disableedit)
+						editor.getSession().setValue(data);
+					else
+						$('#content').val(data);
+				}
+			);
+			return false;
+		}
+		function dosave()
+		{
+      var filecontent = $('#content').val();
+			if (!disableedit)
+				filecontent = editor.getSession().getValue();
+			$.post( url_script,
+				{ password: $("#password").val(), operation: "save", file: $("#file").val(), content: filecontent },
+				function( data ) { if (data.length > 0) alert( data ); }
+			);
+			return true;
+		}
+		function dobackup()
+		{
+			var filename = $("#file").val();
+			if ($.trim(filename).length <= 0)
+				return false;
+			$.post( url_script,
 				{ password: $("#password").val(), operation: "backup", file: $("#file").val() },
 				function( data ) { alert( data ); }
 			);
@@ -338,13 +341,10 @@ else if(isset($_GET['curpos']))
 		}
 		function dodelete()
 		{
-			$("#oper").val("1");
-			//$url_script
-			//alert("<?php echo $url_script;?>?backup=1&file="+$("#file").val());
 			var filename = $("#file").val();
-			if ($.trim(filename).length <= 0 || !confirm('\352tes vous s\373r de vouloir supprimer le fichier "'+filename+'"?'))
+			if ($.trim(filename).length <= 0 || !confirm('are you sure you want to delete "'+filename+'"?'))
 				return false;
-			$.post( "<?php echo $url_script;?>",
+			$.post( url_script,
 				{ password: $("#password").val(), operation: "delete", file: $("#file").val() },
 				function( data ) {alert( data );}
 			);
@@ -352,45 +352,39 @@ else if(isset($_GET['curpos']))
 		}
 		function dorename()
 		{
-			$("#oper").val("1");
-			//$url_script
-			//alert("<?php echo $url_script;?>?backup=1&file="+$("#file").val());
 			var filename = "<?php echo $file;?>";//$("#file").val();
 			if ($.trim(filename).length <= 0)
 				return false;
 			var newfile = prompt("Enter new name for " + filename, filename);
 			if (newfile == null)
-			    return ;
-			$.post( "<?php echo $url_script;?>",
+					return ;
+			$.post( url_script,
 				{ password: $("#password").val(), operation: "rename", file: newfile, oldfile: "<?php echo $file;?>"/*$("#file").val()*/ },
 				function( data )
 				{
-				    if (data.indexOf("err")!=0)
-				    {
-				        if (confirm(data + "\nGo to new file (changes will not be saved)?"))
-				        {
-                            $("#file").val(newfile);
-                            $("#oper").val("0");
-                            $("#formfile").submit();
-				        }
-				    }
-				    else
-    				    alert( data );
+					if (data.indexOf("err")!=0)
+					{
+						if (confirm(data + "\nGo to new file (changes will not be saved)?"))
+						{
+							$("#file").val(newfile);
+							$("#formfile").submit();
+						}
+					}
+					else
+						alert( data );
 				}
 			);
 			return false;
 		}
 		function getModeFromExt(ext)
-    	{
-    		for (prop in types_ext)
-    		{
-    			for (i=0; i<types_ext[prop].length; i++)
-    				if (types_ext[prop][i]== ext)
-    					return prop;
-    		}
-    		return "php";
-    	}
-		</script>
+		{
+			for (prop in types_ext)
+				for (i=0; i<types_ext[prop].length; i++)
+					if (types_ext[prop][i]== ext)
+						return prop;
+			return "php";
+		}
+	</script>
 		<style type="text/css">
 		input {
 			display: inline;
@@ -432,13 +426,12 @@ else if(isset($_GET['curpos']))
 		</style>
 	</head>
 	<body onload="Init();">
-		<form id="formfile" name="formfile" method="post" action="<?php echo $url_script;?>" onsubmit="onsavecode();">
+		<form id="formfile" name="formfile" method="post" action="<?php echo $url_script;?>" onsubmit="return false;">
 			<input type="hidden" name="password" id="password" value="<?php echo $password;?>"/>
-			<input type="hidden" name="oper" id="oper" value="0"/>
-			<input type="hidden" name="curpos" id="curpos" value="<?php echo $curpos;?>"/>
 			<input type="text" name="file" id="file" value="<?php echo $file;?>"/>
-			<?php echo $newfile==TRUE?" *":"";?><a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
-			<input type="submit" name="button" id="button" value="load/save" />
+			<a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
+			<button name="loadbtn" id="loadbtn" onclick="doload()">load</button>
+			<button name="savebtn" id="savebtn" onclick="dosave()">save</button>
 			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()">backup</button>
 			<button name="delbtn" id="delbtn" onclick="dodelete()">delete</button>
 			<button name="renbtn" id="renbtn" onclick="dorename()">rename</button>
