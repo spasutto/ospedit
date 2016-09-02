@@ -205,7 +205,7 @@ else if(isset($_GET['curpos']))
 <html>
 	<head>
 		<meta http-equiv="content-type" content="text/html; charset=utf-8">
-		<title>OSPEdit</title>
+		<title>OSPEdit v0.1</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
 		<script type="text/javascript" src="https://code.jquery.com/jquery-1.12.3.min.js"></script>
 		<script src="https://code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
