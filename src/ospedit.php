@@ -70,6 +70,7 @@ else if(isset($_GET['operation']))
 
 if ($operation=="load")
 {
+//sleep(7);
 	echo $content;
 	exit(0);
 }
@@ -209,7 +210,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 <html>
 	<head>
 		<meta http-equiv="content-type" content="text/html; charset=utf-8">
-		<title>OSPEdit</title>
+		<title>OSPEdit v0.2</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
 		<script type="text/javascript" src="https://code.jquery.com/jquery-1.12.3.min.js"></script>
 		<script src="https://code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
@@ -224,8 +225,13 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			"css" : ["css"],
 			"php" : ["php", "php3","php4"]
 		};
+    var interval_loading = null;
+		var div_loading;
+		var div_message;
 		function Init()
 		{
+   		div_loading = $("#loading");
+      div_message = $("#message");
 			disableedit = disableedit || is_touch_device() || typeof ace != "object";
 			if (!disableedit)
 			{
@@ -249,7 +255,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 					//log( ui.item ? "Selected: " + ui.item.value + " aka " + ui.item.id : "Nothing selected, input was " + this.value );
 					$("#file").val(ui.item.value);
 					if (ui.item.type != "folder")
-						$("#formfile").submit();
+						doload();
 					//else
 					//	setTimeout(function(){ $("#file").autocomplete('search', ui.item.value); }, 1000);
 				}
@@ -270,6 +276,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				}
 				return true;
 			});
+      $( document ).ajaxStart(function() {disable_btns(true);loading(true);});
+      $( document ).ajaxStop(function() {disable_btns(false);loading(false);});
 		}
 		function initcatcomplete()
 		{
@@ -289,6 +297,37 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 					});
 				}
 			});
+		}
+		function loading(bloading)
+		{
+			if (bloading)
+			{
+				var cur_loading = 1;
+        div_loading[0].innerHTML = "loading";
+				div_loading.fadeIn(1000);
+	    	interval_loading = setInterval(function(){
+					div_loading[0].innerHTML = "loading";
+					for (i=0;i<cur_loading;i++)
+						div_loading[0].innerHTML += ".";
+	        cur_loading++;
+					if (cur_loading == 4)
+	          cur_loading = 0;
+				}, 1000);
+			}
+			else
+			{
+				clearInterval(interval_loading);
+				div_loading[0].innerHTML = "";
+        div_loading.hide();
+			}
+		}
+		function disable_btns(bdisable)
+		{
+			$("#loadbtn")[0].disabled = bdisable;
+			$("#savebtn")[0].disabled = bdisable;
+			$("#bkpbtn")[0].disabled = bdisable;
+			$("#delbtn")[0].disabled = bdisable;
+			$("#renbtn")[0].disabled = bdisable;
 		}
 		function is_touch_device()
 		{
@@ -324,7 +363,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				filecontent = editor.getSession().getValue();
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "save", file: $("#file").val(), content: filecontent },
-				function( data ) { if (data.length > 0) alert( data ); }
+				function( data ) { if (data.length > 0) div_message.html( data ); }
 			);
 			return true;
 		}
@@ -335,7 +374,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				return false;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "backup", file: $("#file").val() },
-				function( data ) { alert( data ); }
+				function( data ) { div_message.html( data ); }
 			);
 			return false;
 		}
@@ -346,7 +385,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				return false;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "delete", file: $("#file").val() },
-				function( data ) {alert( data );}
+				function( data ) {div_message.html( data );}
 			);
 			return false;
 		}
@@ -428,13 +467,15 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 	<body onload="Init();">
 		<form id="formfile" name="formfile" method="post" action="<?php echo $url_script;?>" onsubmit="return false;">
 			<input type="hidden" name="password" id="password" value="<?php echo $password;?>"/>
-			<input type="text" name="file" id="file" value="<?php echo $file;?>"/>
+			<input type="text" name="file" id="file" value="<?php echo $file;?>" autofocus/>
 			<a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
 			<button name="loadbtn" id="loadbtn" onclick="doload()">load</button>
 			<button name="savebtn" id="savebtn" onclick="dosave()">save</button>
 			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()">backup</button>
 			<button name="delbtn" id="delbtn" onclick="dodelete()">delete</button>
 			<button name="renbtn" id="renbtn" onclick="dorename()">rename</button>
+			<span id="loading" style="display:none;"></span>
+			<span id="message"></span>
 			<textarea name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
 		</form>
 		<div id="editor"><?php echo htmlspecialchars($content);?></div>
