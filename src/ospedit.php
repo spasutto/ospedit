@@ -78,14 +78,14 @@ else if ($operation=="save")
 {
 	if (true/*file_exists($file)*/)
 	{
-    if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
-    {
-    	$content = $_POST['content'];
-    	if (file_put_contents($file, htmlspecialchars_decode($content)))
-        echo "ok: file saved.";
-    }
+		if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
+		{
+			$content = $_POST['content'];
+			if (file_put_contents($file, htmlspecialchars_decode($content)))
+				echo "ok: file saved.";
+		}
 	}
-  else
+	else
 		echo "error: ".$file." doesn't exists";
 	exit(0);
 }
@@ -116,11 +116,11 @@ else if ($operation=="delete")
 }
 else if ($operation=="rename")
 {
-		$oldfile='';
-		if(isset($_POST['oldfile']))
-			$oldfile = htmlspecialchars($_POST['oldfile']);
-		else if(isset($_GET['file']))
-			$oldfile = htmlspecialchars($_GET['oldfile']);
+	$oldfile='';
+	if(isset($_POST['oldfile']))
+		$oldfile = htmlspecialchars($_POST['oldfile']);
+	else if(isset($_GET['file']))
+		$oldfile = htmlspecialchars($_GET['oldfile']);
 	if (!is_file($oldfile))
 		echo "error: ".$oldfile." doesn't exists";
 	if (is_file($file))
@@ -145,6 +145,7 @@ else if(isset($_GET['term']))
 	$searchterm = htmlspecialchars($_GET['term']);
 if (strlen(trim($searchterm))>0)
 {
+//sleep(1);
 	$rep = '';
 	$islash = strrpos($searchterm, '/');
 	$ibslash = strrpos($searchterm, '\\');
@@ -223,31 +224,30 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			"javascript" : ["js"],
 			"html" : ["htm","html"],
 			"css" : ["css"],
-			"php" : ["php", "php3","php4"]
+			"php" : ["php", "php3", "php4"]
 		};
-    var interval_loading = null;
+		var interval_loading = null;
 		var div_loading;
 		var div_message;
+		var show_loading = true;
+		var has_changes = false;
+		var current_file = "";
 		function Init()
 		{
-   		div_loading = $("#loading");
-      div_message = $("#message");
+	 		div_loading = $("#loading");
+			div_message = $("#message");
 			disableedit = disableedit || is_touch_device() || typeof ace != "object";
 			if (!disableedit)
 			{
 				document.getElementById('content').style.display = 'none';
-				editor = ace.edit("editor");
-				editor.setTheme("ace/theme/twilight");
-				var filename = $("#file").val();
-				var filext=filename.substring(filename.lastIndexOf(".")+1, filename.length);
-				filext=filext.toLowerCase();
-				editor.session.setMode("ace/mode/" + getModeFromExt(filext));
+				initeditor();
 			}
 			else
 				document.getElementById('editor').style.display = 'none';
 			initcatcomplete();
 			$( "#file" ).catcomplete({
 				source: function (request, response) {
+					show_loading = false;
 					$.post(url_script, {password: $("#password").val(), term: request.term}, response, "json");
 				},
 				delay: 0,//minLength: 2,
@@ -260,13 +260,6 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 					//	setTimeout(function(){ $("#file").autocomplete('search', ui.item.value); }, 1000);
 				}
 			});
-			$("#formfile").submit(function() {
-				if ($("#oper").val()=="1")
-				{
-					$("#oper").val("0");
-					return false;
-				}
-			});
 			$(document).keydown(function(e) {
 				if ((e.which == '115' || e.which == '83' ) && (e.ctrlKey || e.metaKey))
 				{
@@ -276,8 +269,26 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				}
 				return true;
 			});
-      $( document ).ajaxStart(function() {disable_btns(true);loading(true);});
-      $( document ).ajaxStop(function() {disable_btns(false);loading(false);});
+			// TODO : remove this for autocomplete
+			$( document ).ajaxStart(function() {
+			if (show_loading){disable_btns(true);loading(true);}});
+			$( document ).ajaxStop(function() {disable_btns(false);loading(false);});
+		}
+		function initeditor()
+		{
+			if (!disableedit)
+			{
+				editor = ace.edit("editor");
+				editor.setTheme("ace/theme/twilight");
+				var filename = $("#file").val();
+				var filext=filename.substring(filename.lastIndexOf(".")+1, filename.length);
+				filext=filext.toLowerCase();
+				editor.session.setMode("ace/mode/" + getModeFromExt(filext));
+				editor.on("input", function() {
+					has_changes = !editor.session.getUndoManager().isClean();
+					redraw_btns();
+				});
+			}
 		}
 		function initcatcomplete()
 		{
@@ -303,23 +314,30 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			if (bloading)
 			{
 				var cur_loading = 1;
-        div_loading[0].innerHTML = "loading";
+				div_loading[0].innerHTML = "loading";
 				div_loading.fadeIn(1000);
-	    	interval_loading = setInterval(function(){
+				interval_loading = setInterval(function(){
 					div_loading[0].innerHTML = "loading";
 					for (i=0;i<cur_loading;i++)
 						div_loading[0].innerHTML += ".";
-	        cur_loading++;
+					cur_loading++;
 					if (cur_loading == 4)
-	          cur_loading = 0;
+						cur_loading = 0;
 				}, 1000);
 			}
 			else
 			{
 				clearInterval(interval_loading);
 				div_loading[0].innerHTML = "";
-        div_loading.hide();
+				div_loading.hide();
 			}
+		}
+		function redraw_btns()
+		{
+			$("#savebtn")[0].disabled = !has_changes;
+			$("#bkpbtn")[0].disabled = !has_changes;
+			$("#delbtn")[0].disabled = !has_changes;
+			$("renbtn")[0].disabled = !has_changes;
 		}
 		function disable_btns(bdisable)
 		{
@@ -337,30 +355,37 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				return true;
 			} catch (e) { return false; }
 		}
-		var current_file = "";
 		function doload()
 		{
 			var filename = $("#file").val();
 			if ($.trim(filename).length <= 0)
 				return false;
+			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "load", file: $("#file").val() },
 				function( data )
 				{
-					current_file = $("#file").val();
+					current_file = $("#file").val();//alert('loaded');
 					if (!disableedit)
 						editor.getSession().setValue(data);
 					else
 						$('#content').val(data);
+					initeditor();
 				}
 			);
 			return false;
 		}
 		function dosave()
 		{
-      var filecontent = $('#content').val();
+			var filecontent = $('#content').val();
 			if (!disableedit)
 				filecontent = editor.getSession().getValue();
+			if (!disableedit)
+			{
+				editor.session.getUndoManager().markClean();
+				$("#savebtn")[0].disabled = editor.session.getUndoManager().isClean()
+			}
+			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "save", file: $("#file").val(), content: filecontent },
 				function( data ) { if (data.length > 0) div_message.html( data ); }
@@ -372,6 +397,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			var filename = $("#file").val();
 			if ($.trim(filename).length <= 0)
 				return false;
+			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "backup", file: $("#file").val() },
 				function( data ) { div_message.html( data ); }
@@ -383,6 +409,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			var filename = $("#file").val();
 			if ($.trim(filename).length <= 0 || !confirm('are you sure you want to delete "'+filename+'"?'))
 				return false;
+			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "delete", file: $("#file").val() },
 				function( data ) {div_message.html( data );}
@@ -397,6 +424,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			var newfile = prompt("Enter new name for " + filename, filename);
 			if (newfile == null)
 					return ;
+			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "rename", file: newfile, oldfile: "<?php echo $file;?>"/*$("#file").val()*/ },
 				function( data )
@@ -470,10 +498,10 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			<input type="text" name="file" id="file" value="<?php echo $file;?>" autofocus/>
 			<a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
 			<button name="loadbtn" id="loadbtn" onclick="doload()">load</button>
-			<button name="savebtn" id="savebtn" onclick="dosave()">save</button>
-			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()">backup</button>
-			<button name="delbtn" id="delbtn" onclick="dodelete()">delete</button>
-			<button name="renbtn" id="renbtn" onclick="dorename()">rename</button>
+			<button name="savebtn" id="savebtn" onclick="dosave()" disabled>save</button>
+			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()" disabled>backup</button>
+			<button name="delbtn" id="delbtn" onclick="dodelete()" disabled>delete</button>
+			<button name="renbtn" id="renbtn" onclick="dorename()" disabled>rename</button>
 			<span id="loading" style="display:none;"></span>
 			<span id="message"></span>
 			<textarea name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
