@@ -70,7 +70,7 @@ else if(isset($_GET['operation']))
 
 if ($operation=="load")
 {
-//sleep(7);
+sleep(7);
 	echo $content;
 	exit(0);
 }
@@ -215,7 +215,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
 		<script type="text/javascript" src="https://code.jquery.com/jquery-1.12.3.min.js"></script>
 		<script src="https://code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
-		<script src="js/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ace.js" type="text/javascript" charset="utf-8"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
 		<script type="text/javascript">
 		var editor = null;
 		var disableedit = <?php echo $disableedit==TRUE?"true":"false";?>;
@@ -232,18 +233,17 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		var show_loading = true;
 		var has_changes = false;
 		var current_file = "";
+		var spinner = null;
 		function Init()
 		{
 	 		div_loading = $("#loading");
 			div_message = $("#message");
 			disableedit = disableedit || is_touch_device() || typeof ace != "object";
 			if (!disableedit)
-			{
-				document.getElementById('content').style.display = 'none';
-				initeditor();
-			}
+				$('#content').hide();
 			else
-				document.getElementById('editor').style.display = 'none';
+				$('#editor').hide();
+			initeditor();
 			initcatcomplete();
 			$( "#file" ).catcomplete({
 				source: function (request, response) {
@@ -269,26 +269,39 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				}
 				return true;
 			});
-			// TODO : remove this for autocomplete
 			$( document ).ajaxStart(function() {
 			if (show_loading){disable_btns(true);loading(true);}});
 			$( document ).ajaxStop(function() {disable_btns(false);loading(false);});
+			initspinner();
 		}
 		function initeditor()
 		{
 			if (!disableedit)
 			{
-				editor = ace.edit("editor");
-				editor.setTheme("ace/theme/twilight");
+				window.editor = ace.edit("editor");
+				window.editor.setTheme("ace/theme/twilight");
 				var filename = $("#file").val();
 				var filext=filename.substring(filename.lastIndexOf(".")+1, filename.length);
 				filext=filext.toLowerCase();
-				editor.session.setMode("ace/mode/" + getModeFromExt(filext));
-				editor.on("input", function() {
-					has_changes = !editor.session.getUndoManager().isClean();
+				window.editor.session.setMode("ace/mode/" + getModeFromExt(filext));
+				window.editor.on("input", function() {
+					has_changes = !window.editor.session.getUndoManager().isClean();
 					redraw_btns();
 				});
 			}
+			else
+			{
+				var timer, editor = $("#content");
+				editor.on("keyup paste cut", function(){
+					clearTimeout(timer);
+					var origvalue = this.value, self = this;
+					timer = setTimeout(function(){
+						has_changes = ( origvalue !== self.value );
+						redraw_btns();
+					},0);
+				});
+			}
+			has_changes = false;
 		}
 		function initcatcomplete()
 		{
@@ -309,35 +322,42 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				}
 			});
 		}
+		function initspinner()
+		{
+			var opts = {
+				lines: 13 // The number of lines to draw
+			, length: 28 // The length of each line
+			, width: 14 // The line thickness
+			, radius: 42 // The radius of the inner circle
+			, scale: 1 // Scales overall size of the spinner
+			, corners: 1 // Corner roundness (0..1)
+			, color: '#7FB9F2' // #rgb or #rrggbb or array of colors
+			, opacity: 0.25 // Opacity of the lines
+			, rotate: 0 // The rotation offset
+			, direction: 1 // 1: clockwise, -1: counterclockwise
+			, speed: 1 // Rounds per second
+			, trail: 60 // Afterglow percentage
+			, fps: 20 // Frames per second when using setTimeout() as a fallback for CSS
+			, zIndex: 2e9 // The z-index (defaults to 2000000000)
+			, className: 'spinner' // The CSS class to assign to the spinner
+			, top: '50%' // Top position relative to parent
+			, left: '50%' // Left position relative to parent
+			, shadow: false // Whether to render a shadow
+			, hwaccel: false // Whether to use hardware acceleration
+			, position: 'absolute' // Element positioning
+			}
+			spinner = new Spinner(opts);
+		}
 		function loading(bloading)
 		{
 			if (bloading)
-			{
-				var cur_loading = 1;
-				div_loading[0].innerHTML = "loading";
-				div_loading.fadeIn(1000);
-				interval_loading = setInterval(function(){
-					div_loading[0].innerHTML = "loading";
-					for (i=0;i<cur_loading;i++)
-						div_loading[0].innerHTML += ".";
-					cur_loading++;
-					if (cur_loading == 4)
-						cur_loading = 0;
-				}, 1000);
-			}
+				spinner.spin($('#spinner')[0]);
 			else
-			{
-				clearInterval(interval_loading);
-				div_loading[0].innerHTML = "";
-				div_loading.hide();
-			}
+				spinner.stop();
 		}
 		function redraw_btns()
 		{
 			$("#savebtn")[0].disabled = !has_changes;
-			$("#bkpbtn")[0].disabled = !has_changes;
-			$("#delbtn")[0].disabled = !has_changes;
-			$("renbtn")[0].disabled = !has_changes;
 		}
 		function disable_btns(bdisable)
 		{
@@ -358,7 +378,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		function doload()
 		{
 			var filename = $("#file").val();
-			if ($.trim(filename).length <= 0)
+			if ($.trim(filename).length <= 0 || (has_changes && !confirm("Warning, you have pending changes, are you sure?")))
 				return false;
 			show_loading = true;
 			$.post( url_script,
@@ -507,5 +527,6 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			<textarea name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
 		</form>
 		<div id="editor"><?php echo htmlspecialchars($content);?></div>
+		<div id="spinner"></div>
 	</body>
 </html>
