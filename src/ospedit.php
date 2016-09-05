@@ -54,7 +54,7 @@ else if(isset($_GET['file']))
 	$file = htmlspecialchars($_GET['file']);
 
 $content='';
-if (strlen(trim($file)) > 0 && @file_exists($file))
+if (strlen(trim($file)) > 0 && @file_exists($file) && !@is_dir($file))
 {
 	$opts = array('http' => array('header' => 'Accept-Charset: UTF-8, *;q=0'));
 	$context = stream_context_create($opts);
@@ -70,8 +70,8 @@ else if(isset($_GET['operation']))
 
 if ($operation=="load")
 {
-sleep(7);
-	echo $content;
+//sleep(7);
+	echo json_encode(["status"=>"ok", "message"=> "", "content"=> $content]);
 	exit(0);
 }
 else if ($operation=="save")
@@ -82,11 +82,11 @@ else if ($operation=="save")
 		{
 			$content = $_POST['content'];
 			if (file_put_contents($file, htmlspecialchars_decode($content)))
-				echo "ok: file saved.";
+				echo json_encode(["status"=>"ok", "message"=> "file saved."]);
 		}
 	}
 	else
-		echo "error: ".$file." doesn't exists";
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
 	exit(0);
 }
 else if ($operation=="backup")
@@ -95,10 +95,10 @@ else if ($operation=="backup")
 	if (is_file($file))
 	{
 		copy($file, $file.".".$today['0']);
-		echo "ok: ".$file." backuped in ".$file.".".$today['0'];
+		echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." backuped in ".$file.".".$today['0']]);
 	}
 	else
-		echo "error: ".$file." doesn't exists";
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
 	exit(0);
 }
 else if ($operation=="delete")
@@ -106,12 +106,12 @@ else if ($operation=="delete")
 	if (is_file($file))
 	{
 		if (unlink($file))
-			echo "ok: ".$file." removed.";
+			echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." removed."]);
 		else
-			echo "error while removing ".$file;
+			echo json_encode(["status"=>"ko", "message"=> "error while removing ".$file]);
 	}
 	else
-		echo "error: ".$file." doesn't exists";
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
 	exit(0);
 }
 else if ($operation=="rename")
@@ -121,20 +121,20 @@ else if ($operation=="rename")
 		$oldfile = htmlspecialchars($_POST['oldfile']);
 	else if(isset($_GET['file']))
 		$oldfile = htmlspecialchars($_GET['oldfile']);
-	if (!is_file($oldfile))
-		echo "error: ".$oldfile." doesn't exists";
-	if (is_file($file))
-		echo "error: ".$file." exists";
+	if (!file_exists($oldfile))
+		echo json_encode(["status"=>"ko", "message"=> "\"".$oldfile."\""." doesn't exists"]);
+	else if (file_exists($file))
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." already exists"]);
 	else
 	{
 		rename($oldfile, $file);
-		echo "ok: ".$oldfile." renamed to ".$file;
+		echo json_encode(["status"=>"ok", "message"=> "\"".$oldfile."\""." renamed to ".$file]);
 	}
 	exit(0);
 }
 else if (strlen(trim($operation))>0)
 {
-	echo "error: unknown operation";
+	echo json_encode(["status"=>"ko", "message"=> "error: unknown operation"]);
 	exit(0);
 }
 
@@ -213,10 +213,12 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		<meta http-equiv="content-type" content="text/html; charset=utf-8">
 		<title>OSPEdit v0.2</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
+		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 		<script type="text/javascript" src="https://code.jquery.com/jquery-1.12.3.min.js"></script>
 		<script src="https://code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ace.js" type="text/javascript" charset="utf-8"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
 		<script type="text/javascript">
 		var editor = null;
 		var disableedit = <?php echo $disableedit==TRUE?"true":"false";?>;
@@ -292,7 +294,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			else
 			{
 				var timer, editor = $("#content");
-				editor.on("keyup paste cut", function(){
+				editor.on("keydown paste cut", function(){
 					clearTimeout(timer);
 					var origvalue = this.value, self = this;
 					timer = setTimeout(function(){
@@ -302,6 +304,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				});
 			}
 			has_changes = false;
+			redraw_btns();
 		}
 		function initcatcomplete()
 		{
@@ -375,6 +378,35 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				return true;
 			} catch (e) { return false; }
 		}
+		function show_message(message, bError)
+		{
+			if (toastr)
+			{
+				var ltoastr = bError ? toastr.error : toastr.info;
+				ltoastr(message);
+			}
+			else
+			{
+				div_message.html( message );
+				div_message.css('color', bError?'red':'black');
+			}
+		}
+		function trygetdata(data, bdisplay)
+		{
+			bdisplay = typeof bdisplay === "boolean" ? bdisplay : false;
+			try
+			{
+				data = $.parseJSON(data);
+			}
+			catch(e)
+			{
+				data = typeof data === "string" ? data : "";
+				data = {status : 'ko', message :'Error while retrieving server content:\r\n' + data.substring(0, 150)};
+			}
+			if (bdisplay && typeof data.message === "string" && $.trim(data.message).length > 0)
+				show_message(data.message, data.status == "ko");
+			return data;
+		}
 		function doload()
 		{
 			var filename = $("#file").val();
@@ -385,12 +417,16 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				{ password: $("#password").val(), operation: "load", file: $("#file").val() },
 				function( data )
 				{
-					current_file = $("#file").val();//alert('loaded');
-					if (!disableedit)
-						editor.getSession().setValue(data);
-					else
-						$('#content').val(data);
-					initeditor();
+					data = trygetdata(data, true);
+					if (data.status == "ok")
+					{
+						current_file = $("#file").val();//alert('loaded');
+						if (!disableedit)
+							editor.getSession().setValue(data.content);
+						else
+							$('#content').val(data.content);
+						initeditor();
+					}
 				}
 			);
 			return false;
@@ -408,7 +444,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "save", file: $("#file").val(), content: filecontent },
-				function( data ) { if (data.length > 0) div_message.html( data ); }
+				function( data ) { trygetdata(data, true); }
 			);
 			return true;
 		}
@@ -420,7 +456,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "backup", file: $("#file").val() },
-				function( data ) { div_message.html( data ); }
+				function( data ) { trygetdata(data, true); }
 			);
 			return false;
 		}
@@ -432,33 +468,32 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "delete", file: $("#file").val() },
-				function( data ) {div_message.html( data );}
+				function( data ) { trygetdata(data, true); }
 			);
 			return false;
 		}
 		function dorename()
 		{
-			var filename = "<?php echo $file;?>";//$("#file").val();
+			var filename = $("#file").val();
 			if ($.trim(filename).length <= 0)
 				return false;
 			var newfile = prompt("Enter new name for " + filename, filename);
-			if (newfile == null)
+			if (newfile == null || $.trim(newfile) == $.trim(filename))
 					return ;
 			show_loading = true;
 			$.post( url_script,
-				{ password: $("#password").val(), operation: "rename", file: newfile, oldfile: "<?php echo $file;?>"/*$("#file").val()*/ },
+				{ password: $("#password").val(), operation: "rename", file: newfile, oldfile: filename },
 				function( data )
 				{
-					if (data.indexOf("err")!=0)
+					data = trygetdata(data, true);
+					if (data.status == "ok")
 					{
-						if (confirm(data + "\nGo to new file (changes will not be saved)?"))
+						if (confirm("Go to new file"+(has_changes?" (changes will not be saved)":"")+"?"))
 						{
 							$("#file").val(newfile);
 							$("#formfile").submit();
 						}
 					}
-					else
-						alert( data );
 				}
 			);
 			return false;
@@ -487,6 +522,14 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		}
 		body {
 			overflow: hidden;
+			font-family: tahoma;
+		}
+		html, body {
+			height: 100%;
+		}
+		#content {
+			width: 100%;
+			height: 100%;
 		}
 		#editor {
 			margin: 0;
@@ -495,6 +538,10 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			bottom: 0;
 			left: 0;
 			right: 0;
+		}
+		#message {
+			font-family: monospace;
+			margin-left: 10px;
 		}
 		.ui-autocomplete {
 			max-height: 600px;
