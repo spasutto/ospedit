@@ -10,4 +10,4 @@ Just change the default password ("###\_YOUR\_PASSWORD\_HERE\_###") and eventual
 
 OSPEdit can use the excellent [Ace editor](https://ace.c9.io/) to use syntax checking/highlighting.
 
-![Screenshot of OSPEdit](https://raw.githubusercontent.com/spasutto/ospedit/master/screenshot.png)
+![Screenshot of OSPEdit](https://raw.githubusercontent.com/spasutto/ospedit/ajax/screenshot.png)
