@@ -214,10 +214,10 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		<title>OSPEdit v0.2</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
 		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-		<script type="text/javascript" src="https://code.jquery.com/jquery-1.12.3.min.js"></script>
-		<script src="https://code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ace.js" type="text/javascript" charset="utf-8"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
+		<script src="//code.jquery.com/jquery-1.12.3.min.js" type="text/javascript"></script>
+		<script src="//code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ace.js" type="text/javascript" charset="utf-8"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
 		<script type="text/javascript">
 		var editor = null;
@@ -257,23 +257,27 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 					//log( ui.item ? "Selected: " + ui.item.value + " aka " + ui.item.id : "Nothing selected, input was " + this.value );
 					$("#file").val(ui.item.value);
 					if (ui.item.type != "folder")
-						doload();
+					{
+						setTimeout(function(){
+							doload();
+						},0);
+					}
 					//else
 					//	setTimeout(function(){ $("#file").autocomplete('search', ui.item.value); }, 1000);
 				}
 			});
+			$( "#file" ).on("keyup paste cut", function(){toggle_btns();});
 			$(document).keydown(function(e) {
 				if ((e.which == '115' || e.which == '83' ) && (e.ctrlKey || e.metaKey))
 				{
 					e.preventDefault();
-					$("#formfile").submit();
+					dosave();
 					return false;
 				}
 				return true;
 			});
-			$( document ).ajaxStart(function() {
-			if (show_loading){disable_btns(true);loading(true);}});
-			$( document ).ajaxStop(function() {disable_btns(false);loading(false);});
+			$(document).ajaxStart(function() {if (show_loading){toggle_btns(true);loading(true);}});
+			$(document).ajaxStop(function() {toggle_btns(false);loading(false);});
 			initspinner();
 		}
 		function initeditor()
@@ -288,7 +292,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				window.editor.session.setMode("ace/mode/" + getModeFromExt(filext));
 				window.editor.on("input", function() {
 					has_changes = !window.editor.session.getUndoManager().isClean();
-					redraw_btns();
+					/*redraw_btns*/toggle_btns();
 				});
 			}
 			else
@@ -299,12 +303,12 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 					var origvalue = this.value, self = this;
 					timer = setTimeout(function(){
 						has_changes = ( origvalue !== self.value );
-						redraw_btns();
+						/*redraw_btns*/toggle_btns();
 					},0);
 				});
 			}
 			has_changes = false;
-			redraw_btns();
+			/*redraw_btns*/toggle_btns();
 		}
 		function initcatcomplete()
 		{
@@ -362,13 +366,14 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		{
 			$("#savebtn")[0].disabled = !has_changes;
 		}
-		function disable_btns(bdisable)
+		function toggle_btns(bdisable)
 		{
-			$("#loadbtn")[0].disabled = bdisable;
-			$("#savebtn")[0].disabled = bdisable;
-			$("#bkpbtn")[0].disabled = bdisable;
-			$("#delbtn")[0].disabled = bdisable;
-			$("#renbtn")[0].disabled = bdisable;
+			var is_file_selected = $.trim($("#file").val()).length > 0;
+			$("#loadbtn")[0].disabled = !is_file_selected || bdisable;
+			$("#savebtn")[0].disabled = !has_changes || bdisable;
+			$("#bkpbtn")[0].disabled = !is_file_selected || bdisable;
+			$("#delbtn")[0].disabled = !is_file_selected || bdisable;
+			$("#renbtn")[0].disabled = !is_file_selected || bdisable;
 		}
 		function is_touch_device()
 		{
@@ -410,8 +415,13 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		function doload()
 		{
 			var filename = $("#file").val();
-			if ($.trim(filename).length <= 0 || (has_changes && !confirm("Warning, you have pending changes, are you sure?")))
+			if ($.trim(filename).length <= 0)
 				return false;
+			if (has_changes && !confirm("Warning, you have pending changes, are you sure?"))
+			{
+				$("#file").val(current_file);
+				return false;
+			}
 			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "load", file: $("#file").val() },
@@ -564,7 +574,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			<input type="hidden" name="password" id="password" value="<?php echo $password;?>"/>
 			<input type="text" name="file" id="file" value="<?php echo $file;?>" autofocus/>
 			<a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
-			<button name="loadbtn" id="loadbtn" onclick="doload()">load</button>
+			<button name="loadbtn" id="loadbtn" onclick="doload()" disabled>load</button>
 			<button name="savebtn" id="savebtn" onclick="dosave()" disabled>save</button>
 			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()" disabled>backup</button>
 			<button name="delbtn" id="delbtn" onclick="dodelete()" disabled>delete</button>
