@@ -70,7 +70,7 @@ else if(isset($_GET['operation']))
 
 if ($operation=="load")
 {
-sleep(3);
+//sleep(3);
 	echo json_encode(["status"=>"ok", "message"=> "", "content"=> $content]);
 	exit(0);
 }
