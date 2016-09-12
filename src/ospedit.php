@@ -70,7 +70,7 @@ else if(isset($_GET['operation']))
 
 if ($operation=="load")
 {
-//sleep(7);
+sleep(3);
 	echo json_encode(["status"=>"ok", "message"=> "", "content"=> $content]);
 	exit(0);
 }
@@ -331,6 +331,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		}
 		function initspinner()
 		{
+      if (typeof Spinner !== "object" && typeof Spinner !== "function")
+        window.Spinner = function(){this.spin=function (){div_loading.show();};this.stop=function (){div_loading.hide();};};
 			var opts = {
 				lines: 13 // The number of lines to draw
 			, length: 28 // The length of each line
@@ -553,6 +555,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			font-family: monospace;
 			margin-left: 10px;
 		}
+		#loading {
+			display:none;
+		}
 		.ui-autocomplete {
 			max-height: 600px;
 			overflow-y: auto;
@@ -579,7 +584,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()" disabled>backup</button>
 			<button name="delbtn" id="delbtn" onclick="dodelete()" disabled>delete</button>
 			<button name="renbtn" id="renbtn" onclick="dorename()" disabled>rename</button>
-			<span id="loading" style="display:none;"></span>
+			<span id="loading" style="display:none;">Loading...</span>
 			<span id="message"></span>
 			<textarea name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
 		</form>
