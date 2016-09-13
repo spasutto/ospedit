@@ -238,8 +238,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		var spinner = null;
 		function Init()
 		{
-	 		div_loading = $("#loading");
+			div_loading = $("#loading");
 			div_message = $("#message");
+			div_message.click(function(){$(this).html('');});
 			disableedit = disableedit || is_touch_device() || typeof ace != "object";
 			if (!disableedit)
 				$('#content').hide();
@@ -278,6 +279,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			});
 			$(document).ajaxStart(function() {if (show_loading){toggle_btns(true);loading(true);}});
 			$(document).ajaxStop(function() {toggle_btns(false);loading(false);});
+			$( document ).ajaxError(function( event, jqxhr, settings, thrownError ) {
+				show_message( "Error while posting!!! Server down?", true );
+			});
 			initspinner();
 		}
 		function initeditor()
@@ -286,10 +290,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			{
 				window.editor = ace.edit("editor");
 				window.editor.setTheme("ace/theme/twilight");
-				var filename = $("#file").val();
-				var filext=filename.substring(filename.lastIndexOf(".")+1, filename.length);
-				filext=filext.toLowerCase();
-				window.editor.session.setMode("ace/mode/" + getModeFromExt(filext));
+				window.editor.session.setMode("ace/mode/" + getModeFromFile($("#file").val()));
 				window.editor.on("input", function() {
 					has_changes = !window.editor.session.getUndoManager().isClean();
 					/*redraw_btns*/toggle_btns();
@@ -331,8 +332,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		}
 		function initspinner()
 		{
-      if (typeof Spinner !== "object" && typeof Spinner !== "function")
-        window.Spinner = function(){this.spin=function (){div_loading.show();};this.stop=function (){div_loading.hide();};};
+			if (typeof Spinner !== "object" && typeof Spinner !== "function")
+			window.Spinner = function(){this.spin=function (){div_loading.show();};this.stop=function (){div_loading.hide();};};
 			var opts = {
 				lines: 13 // The number of lines to draw
 			, length: 28 // The length of each line
@@ -387,7 +388,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		}
 		function show_message(message, bError)
 		{
-			if (toastr)
+			if (typeof toastr !== "undefined")
 			{
 				var ltoastr = bError ? toastr.error : toastr.info;
 				ltoastr(message);
@@ -480,7 +481,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "delete", file: $("#file").val() },
-				function( data ) { trygetdata(data, true); }
+				function( data ) { data = trygetdata(data, true); /*if (data.status=="ok") has_changes = true;*/ }
 			);
 			return false;
 		}
@@ -510,11 +511,12 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			);
 			return false;
 		}
-		function getModeFromExt(ext)
+		function getModeFromFile(filename)
 		{
+			filename=filename.substring(filename.lastIndexOf(".")+1, filename.length).toLowerCase();
 			for (prop in types_ext)
 				for (i=0; i<types_ext[prop].length; i++)
-					if (types_ext[prop][i]== ext)
+					if (types_ext[prop][i]== filename)
 						return prop;
 			return "php";
 		}
