@@ -456,7 +456,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			show_loading = true;
 			$.post( url_script,
 				{ password: $("#password").val(), operation: "save", file: $("#file").val(), content: filecontent },
-				function( data ) { trygetdata(data, true); }
+				function( data ) { data = trygetdata(data, true);if (data.status == "ok") has_changes = false; }
 			);
 			return true;
 		}
