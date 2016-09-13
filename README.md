@@ -3,8 +3,11 @@ OSPEdit is a (really) simple on-site source code editor, written in PHP
 
 /!\ Warning, ospedit can browse for folders, wipe files and give access to your web site source code to anyone if misused (or not); use it at your own risk !!!
 
-## Installation 
-Just change the default password ("###_YOUR_PASSWORD_HERE_###") and eventually the inclusion path of jquery/ui js and css scripts.
+## Installation
+Just change the default password ("###\_YOUR\_PASSWORD\_HERE\_###") and eventually the inclusion path of [jQuery](https://jquery.com/)/[jQuery ui](https://jqueryui.com/)/[Ace](https://ace.c9.io/)/[spin.js](http://spin.js.org/)/[toastr](http://codeseven.github.io/toastr/) js and css scripts.
 
-You can also download a copy of the excellent [ace editor](https://ace.c9.io/) to use syntax checking/highlighting. Just choose your ace type of distrib and place it in the right folder (default : js/src-min-noconflict/)
+**Note** : excepted jQuery and jQuery ui, theses third-party library are not mandatory, you can disable any of this third-party library by deleting scripts/link tags
 
+OSPEdit can use the excellent [Ace editor](https://ace.c9.io/) to use syntax checking/highlighting.
+
+![Screenshot of OSPEdit](https://raw.githubusercontent.com/spasutto/ospedit/ajax/screenshot.png)

@@ -25,7 +25,7 @@ SOFTWARE.
 header('Content-Type: text/html; charset=UTF-8');
 header("X-XSS-Protection: 0");
 
-$url_script = "http".(!empty($_SERVER['HTTPS'])?"s":"")."://".$_SERVER['SERVER_NAME'].$_SERVER['REQUEST_URI'];
+$url_script = "http".(!empty($_SERVER['HTTPS'])?"s":"")."://".$_SERVER['SERVER_NAME'].":".$_SERVER['SERVER_PORT'].$_SERVER['REQUEST_URI'];
 
 $password='';
 if(isset($_POST['password']))
@@ -37,11 +37,11 @@ if ($password != "###_YOUR_PASSWORD_HERE_###")
 {
 ?>
 <center>
-  <form method="POST">
-  Please enter your password : <BR>
-    <input type="password" name="password" autofocus>
-    <input type="submit" value="connect">
-  </form>
+	<form method="POST">
+	Please enter your password : <BR>
+		<input type="password" name="password" autofocus>
+		<input type="submit" value="connect">
+	</form>
 </center>
 <?php
 	exit(0);
@@ -53,22 +53,64 @@ if(isset($_POST['file']))
 else if(isset($_GET['file']))
 	$file = htmlspecialchars($_GET['file']);
 
+$content='';
+if (strlen(trim($file)) > 0 && @file_exists($file) && !@is_dir($file))
+{
+	$fc = file_get_contents($file);
+	$fenc = mb_detect_encoding($fc);
+	if (strtolower($fenc) != 'utf-8')
+		$fc = iconv(/*'windows-1250'*/$fenc, 'utf-8', file_get_contents($file));
+	$handle = fopen("php://memory", "rw");
+	fwrite($handle, $fc);
+	fseek($handle, 0);
+	$content = fread($handle,filesize($file));
+	// remove BOM https://fr.wikipedia.org/wiki/Indicateur_d%27ordre_des_octets
+	if (substr($content, 0, 3) == chr(0xef).chr(0xbb).chr(0xbf))
+		$content = substr($content, 3);
+	else if (substr($content, 0, 2) == chr(0xfe).chr(0xff))
+		$content = substr($content, 2);
+}
+
 $operation='';
 if(isset($_POST['operation']))
 	$operation = htmlspecialchars($_POST['operation']);
 else if(isset($_GET['operation']))
 	$operation = htmlspecialchars($_GET['operation']);
 
-if ($operation=="backup")
+if ($operation=="load")
 {
-	$today =getdate();
+//sleep(3);
+	if (!file_exists($file) || !is_file($file))
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." isn't a file"]);
+	else
+		echo json_encode(["status"=>"ok", "message"=> "", "content"=> $content]);
+	exit(0);
+}
+else if ($operation=="save")
+{
+	if (true/*file_exists($file)*/)
+	{
+		if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
+		{
+			$content = $_POST['content'];
+			if (file_put_contents($file, htmlspecialchars_decode($content)))
+				echo json_encode(["status"=>"ok", "message"=> "file saved."]);
+		}
+	}
+	else
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
+	exit(0);
+}
+else if ($operation=="backup")
+{
+	$today=getdate();
 	if (is_file($file))
 	{
 		copy($file, $file.".".$today['0']);
-		echo "ok: ".$file." backuped in ".$file.".".$today['0'];
+		echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." backuped in ".$file.".".$today['0']]);
 	}
 	else
-		echo "error: ".$file." doesn't exists";
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
 	exit(0);
 }
 else if ($operation=="delete")
@@ -76,35 +118,35 @@ else if ($operation=="delete")
 	if (is_file($file))
 	{
 		if (unlink($file))
-			echo "ok: ".$file." removed.";
+			echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." removed."]);
 		else
-			echo "error while removing ".$file;
+			echo json_encode(["status"=>"ko", "message"=> "error while removing ".$file]);
 	}
 	else
-		echo "error: ".$file." doesn't exists";
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
 	exit(0);
 }
 else if ($operation=="rename")
 {
-    $oldfile='';
-    if(isset($_POST['oldfile']))
-    	$oldfile = htmlspecialchars($_POST['oldfile']);
-    else if(isset($_GET['file']))
-    	$oldfile = htmlspecialchars($_GET['oldfile']);
-	if (!is_file($oldfile))
-		echo "error: ".$oldfile." doesn't exists";
-	if (is_file($file))
-		echo "error: ".$file." exists";
+	$oldfile='';
+	if(isset($_POST['oldfile']))
+		$oldfile = htmlspecialchars($_POST['oldfile']);
+	else if(isset($_GET['file']))
+		$oldfile = htmlspecialchars($_GET['oldfile']);
+	if (!file_exists($oldfile))
+		echo json_encode(["status"=>"ko", "message"=> "\"".$oldfile."\""." doesn't exists"]);
+	else if (file_exists($file))
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." already exists"]);
 	else
 	{
 		rename($oldfile, $file);
-		echo "ok: ".$oldfile." renamed to ".$file;
+		echo json_encode(["status"=>"ok", "message"=> "\"".$oldfile."\""." renamed to ".$file]);
 	}
 	exit(0);
 }
 else if (strlen(trim($operation))>0)
 {
-	echo "error: unknown operation";
+	echo json_encode(["status"=>"ko", "message"=> "error: unknown operation"]);
 	exit(0);
 }
 
@@ -115,6 +157,7 @@ else if(isset($_GET['term']))
 	$searchterm = htmlspecialchars($_GET['term']);
 if (strlen(trim($searchterm))>0)
 {
+//sleep(1);
 	$rep = '';
 	$islash = strrpos($searchterm, '/');
 	$ibslash = strrpos($searchterm, '\\');
@@ -167,26 +210,6 @@ if (strlen(trim($searchterm))>0)
 	exit(0);
 }
 
-$content='';
-if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
-{
-	$content = $_POST['content'];
-	if (strlen($file) > 0)
-		file_put_contents($file, htmlspecialchars_decode($content));
-}
-if (file_exists($file))
-{
-	$opts = array('http' => array('header' => 'Accept-Charset: UTF-8, *;q=0'));
-	$context = stream_context_create($opts);
-    $content = file_get_contents($file, false, $context);
-	$newfile = FALSE;
-	//echo $content;
-//$content = utf8_decode($content);
- //$content = iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $content);
-}
-else if (strlen(trim($file))>0)
-	$newfile = TRUE;
-
 $disableedit='0';
 if(isset($_POST['disableedit']))
 	$disableedit = htmlspecialchars($_POST['disableedit']);
@@ -194,88 +217,111 @@ else if(isset($_GET['disableedit']))
 	$disableedit = htmlspecialchars($_GET['disableedit']);
 $disableedit = $disableedit=='1'?TRUE:FALSE;
 
-$curpos='0,0';
-if(isset($_POST['curpos']))
-	$curpos = htmlspecialchars($_POST['curpos']);
-else if(isset($_GET['curpos']))
-	$curpos = htmlspecialchars($_GET['curpos']);
 ?>
 
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 	<head>
 		<meta http-equiv="content-type" content="text/html; charset=utf-8">
-		<title>OSPEdit v0.1</title>
+		<title>OSPEdit v0.2</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
-		<script type="text/javascript" src="https://code.jquery.com/jquery-1.12.3.min.js"></script>
-		<script src="https://code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
-		<script src="js/src-min-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+		<script src="//code.jquery.com/jquery-1.12.3.min.js" type="text/javascript"></script>
+		<script src="//code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ace.js" type="text/javascript" charset="utf-8"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
 		<script type="text/javascript">
 		var editor = null;
 		var disableedit = <?php echo $disableedit==TRUE?"true":"false";?>;
-		//var newfile = <?php echo $newfile==TRUE?"true":"false";?>;
+		var url_script = "<?php echo $url_script;?>";
 		var types_ext = {
 			"javascript" : ["js"],
 			"html" : ["htm","html"],
 			"css" : ["css"],
-			"php" : ["php", "php3","php4"]
+			"php" : ["php", "php3", "php4"]
 		};
+		var interval_loading = null;
+		var div_loading;
+		var div_message;
+		var show_loading = true;
+		var has_changes = false;
+		var current_file = "";
+		var spinner = null;
 		function Init()
 		{
+			div_loading = $("#loading");
+			div_message = $("#message");
+			div_message.click(function(){$(this).html('');});
 			disableedit = disableedit || is_touch_device() || typeof ace != "object";
 			if (!disableedit)
-			{
-				document.getElementById('content').style.display = 'none';
-				editor = ace.edit("editor");
-				editor.setTheme("ace/theme/twilight");
-				var filename = $("#file").val();
-				var filext=filename.substring(filename.lastIndexOf(".")+1, filename.length);
-				filext=filext.toLowerCase();
-				editor.session.setMode("ace/mode/" + getModeFromExt(filext));
-				var carretpos = $("#curpos").val().split(",");
-				if (carretpos.length == 2)
-				{
-				    carretpos[0] = parseInt(carretpos[0])+1;
-				    carretpos[1] = parseInt(carretpos[1]);
-				    editor.resize(true)
-    				editor.scrollToLine(carretpos[0], true, true, function () {});
-    				editor.gotoLine(carretpos[0], carretpos[1], true);
-    				editor.focus();
-				}
-			}
+				$('#content').hide();
 			else
-				document.getElementById('editor').style.display = 'none';
+				$('#editor').hide();
+			initeditor();
 			initcatcomplete();
 			$( "#file" ).catcomplete({
 				source: function (request, response) {
-					$.post("<?php echo $url_script;?>", {password: $("#password").val(), term: request.term}, response, "json");
+					show_loading = false;
+					$.post(url_script, {password: $("#password").val(), term: request.term}, response, "json");
 				},
 				delay: 0,//minLength: 2,
 				select: function( event, ui ) {
 					//log( ui.item ? "Selected: " + ui.item.value + " aka " + ui.item.id : "Nothing selected, input was " + this.value );
 					$("#file").val(ui.item.value);
 					if (ui.item.type != "folder")
-						$("#formfile").submit();
+					{
+						setTimeout(function(){
+							doload();
+						},0);
+					}
 					//else
 					//	setTimeout(function(){ $("#file").autocomplete('search', ui.item.value); }, 1000);
 				}
 			});
-			$("#formfile").submit(function() {
-				if ($("#oper").val()=="1")
-				{
-					$("#oper").val("0");
-					return false;
-				}
-			});
+			$( "#file" ).on("keyup paste cut", function(){toggle_btns();});
 			$(document).keydown(function(e) {
 				if ((e.which == '115' || e.which == '83' ) && (e.ctrlKey || e.metaKey))
 				{
 					e.preventDefault();
-					$("#formfile").submit();
+					dosave();
 					return false;
 				}
 				return true;
 			});
+			$(document).ajaxStart(function() {if (show_loading){toggle_btns(true);loading(true);}});
+			$(document).ajaxStop(function() {toggle_btns(false);loading(false);});
+			$( document ).ajaxError(function( event, jqxhr, settings, thrownError ) {
+				show_message( "Error while retrieving server content!!! Server down?", true );
+			});
+			initspinner();
+		}
+		function initeditor()
+		{
+			if (!disableedit)
+			{
+				window.editor = ace.edit("editor");
+				window.editor.setTheme("ace/theme/twilight");
+				window.editor.session.setMode("ace/mode/" + getModeFromFile($("#file").val()));
+				window.editor.on("input", function() {
+					has_changes = !window.editor.session.getUndoManager().isClean();
+					/*redraw_btns*/toggle_btns();
+				});
+			}
+			else
+			{
+				var timer, editor = $("#content");
+				editor.on("keydown paste cut", function(){
+					clearTimeout(timer);
+					var origvalue = this.value, self = this;
+					timer = setTimeout(function(){
+						has_changes = ( origvalue !== self.value );
+						/*redraw_btns*/toggle_btns();
+					},0);
+				});
+			}
+			has_changes = false;
+			/*redraw_btns*/toggle_btns();
 		}
 		function initcatcomplete()
 		{
@@ -296,23 +342,53 @@ else if(isset($_GET['curpos']))
 				}
 			});
 		}
-		function onsavecode()
+		function initspinner()
 		{
-			if (!disableedit)
-			{
-				$('#content').val(editor.getSession().getValue());
-				var row = editor.selection.getCursor().row;
-				var column = editor.selection.getCursor().column;
-				$('#curpos').val(row+","+column);
-				//alert(document.getElementById('content').value);
+			if (typeof Spinner !== "object" && typeof Spinner !== "function")
+			window.Spinner = function(){this.spin=function (){div_loading.show();};this.stop=function (){div_loading.hide();};};
+			var opts = {
+				lines: 13 // The number of lines to draw
+			, length: 28 // The length of each line
+			, width: 14 // The line thickness
+			, radius: 42 // The radius of the inner circle
+			, scale: 1 // Scales overall size of the spinner
+			, corners: 1 // Corner roundness (0..1)
+			, color: '#7FB9F2' // #rgb or #rrggbb or array of colors
+			, opacity: 0.25 // Opacity of the lines
+			, rotate: 0 // The rotation offset
+			, direction: 1 // 1: clockwise, -1: counterclockwise
+			, speed: 1 // Rounds per second
+			, trail: 60 // Afterglow percentage
+			, fps: 20 // Frames per second when using setTimeout() as a fallback for CSS
+			, zIndex: 2e9 // The z-index (defaults to 2000000000)
+			, className: 'spinner' // The CSS class to assign to the spinner
+			, top: '50%' // Top position relative to parent
+			, left: '50%' // Left position relative to parent
+			, shadow: false // Whether to render a shadow
+			, hwaccel: false // Whether to use hardware acceleration
+			, position: 'absolute' // Element positioning
 			}
-			// if the filename is different from original we empty the content to prevent wipe of file
-			if ($('#file').val() != "<?php echo $file;?>")
-			{
-				$('#content').val("");
-				$('#curpos').val("0,0");
-			}
-			return true;
+			spinner = new Spinner(opts);
+		}
+		function loading(bloading)
+		{
+			if (bloading)
+				spinner.spin($('#spinner')[0]);
+			else
+				spinner.stop();
+		}
+		function redraw_btns()
+		{
+			$("#savebtn")[0].disabled = !has_changes;
+		}
+		function toggle_btns(bdisable)
+		{
+			var is_file_selected = $.trim($("#file").val()).length > 0;
+			$("#loadbtn")[0].disabled = !is_file_selected || bdisable;
+			$("#savebtn")[0].disabled = !has_changes || bdisable;
+			$("#bkpbtn")[0].disabled = !is_file_selected || bdisable;
+			$("#delbtn")[0].disabled = !is_file_selected || bdisable;
+			$("#renbtn")[0].disabled = !is_file_selected || bdisable;
 		}
 		function is_touch_device()
 		{
@@ -322,75 +398,141 @@ else if(isset($_GET['curpos']))
 				return true;
 			} catch (e) { return false; }
 		}
-		function dobackup()
+		function show_message(message, bError)
 		{
-			$("#oper").val("1");
-			//$url_script
-			//alert("<?php echo $url_script;?>?backup=1&file="+$("#file").val());
+			if (typeof toastr !== "undefined")
+			{
+				var ltoastr = bError ? toastr.error : toastr.info;
+				ltoastr(message);
+			}
+			else
+			{
+				div_message.html( message );
+				div_message.css('color', bError?'red':'black');
+			}
+		}
+		function trygetdata(data, bdisplay)
+		{
+			bdisplay = typeof bdisplay === "boolean" ? bdisplay : false;
+			try
+			{
+				data = $.parseJSON(data);
+			}
+			catch(e)
+			{
+				data = typeof data === "string" ? data : "";
+				data = {status : 'ko', message :'Error while retrieving server content:\r\n' + data.substring(0, 150)};
+			}
+			if (bdisplay && typeof data.message === "string" && $.trim(data.message).length > 0)
+				show_message(data.message, data.status == "ko");
+			return data;
+		}
+		function doload()
+		{
 			var filename = $("#file").val();
 			if ($.trim(filename).length <= 0)
 				return false;
-			$.post( "<?php echo $url_script;?>",
+			if (has_changes && !confirm("Warning, you have pending changes, are you sure?"))
+			{
+				$("#file").val(current_file);
+				return false;
+			}
+			show_loading = true;
+			$.post( url_script,
+				{ password: $("#password").val(), operation: "load", file: $("#file").val() },
+				function( data )
+				{
+					data = trygetdata(data, true);
+					if (data.status == "ok")
+					{
+						current_file = $("#file").val();//alert('loaded');
+						if (!disableedit)
+							editor.getSession().setValue(data.content);
+						else
+							$('#content').val(data.content);
+						initeditor();
+					}
+				}
+			);
+			return false;
+		}
+		function dosave()
+		{
+			var filecontent = $('#content').val();
+			if (!disableedit)
+				filecontent = editor.getSession().getValue();
+			if (!disableedit)
+			{
+				editor.session.getUndoManager().markClean();
+				$("#savebtn")[0].disabled = editor.session.getUndoManager().isClean()
+			}
+			show_loading = true;
+			$.post( url_script,
+				{ password: $("#password").val(), operation: "save", file: $("#file").val(), content: filecontent },
+				function( data ) { data = trygetdata(data, true);if (data.status == "ok") has_changes = false; }
+			);
+			return true;
+		}
+		function dobackup()
+		{
+			var filename = $("#file").val();
+			if ($.trim(filename).length <= 0)
+				return false;
+			show_loading = true;
+			$.post( url_script,
 				{ password: $("#password").val(), operation: "backup", file: $("#file").val() },
-				function( data ) { alert( data ); }
+				function( data ) { trygetdata(data, true); }
 			);
 			return false;
 		}
 		function dodelete()
 		{
-			$("#oper").val("1");
-			//$url_script
-			//alert("<?php echo $url_script;?>?backup=1&file="+$("#file").val());
 			var filename = $("#file").val();
-			if ($.trim(filename).length <= 0 || !confirm('\352tes vous s\373r de vouloir supprimer le fichier "'+filename+'"?'))
+			if ($.trim(filename).length <= 0 || !confirm('are you sure you want to delete "'+filename+'"?'))
 				return false;
-			$.post( "<?php echo $url_script;?>",
+			show_loading = true;
+			$.post( url_script,
 				{ password: $("#password").val(), operation: "delete", file: $("#file").val() },
-				function( data ) {alert( data );}
+				function( data ) { data = trygetdata(data, true); /*if (data.status=="ok") has_changes = true;*/ }
 			);
 			return false;
 		}
 		function dorename()
 		{
-			$("#oper").val("1");
-			//$url_script
-			//alert("<?php echo $url_script;?>?backup=1&file="+$("#file").val());
-			var filename = "<?php echo $file;?>";//$("#file").val();
+			var filename = $("#file").val();
 			if ($.trim(filename).length <= 0)
 				return false;
 			var newfile = prompt("Enter new name for " + filename, filename);
-			if (newfile == null)
-			    return ;
-			$.post( "<?php echo $url_script;?>",
-				{ password: $("#password").val(), operation: "rename", file: newfile, oldfile: "<?php echo $file;?>"/*$("#file").val()*/ },
+			if (newfile == null || $.trim(newfile) == $.trim(filename))
+					return ;
+			show_loading = true;
+			$.post( url_script,
+				{ password: $("#password").val(), operation: "rename", file: newfile, oldfile: filename },
 				function( data )
 				{
-				    if (data.indexOf("err")!=0)
-				    {
-				        if (confirm(data + "\nGo to new file (changes will not be saved)?"))
-				        {
-                            $("#file").val(newfile);
-                            $("#oper").val("0");
-                            $("#formfile").submit();
-				        }
-				    }
-				    else
-    				    alert( data );
+					data = trygetdata(data, true);
+					if (data.status == "ok")
+					{
+						if (confirm("Go to new file"+(has_changes?" (changes will not be saved)":"")+"?"))
+						{
+							$("#file").val(newfile);
+							$("#formfile").submit();
+						}
+					}
 				}
 			);
 			return false;
 		}
-		function getModeFromExt(ext)
-    	{
-    		for (prop in types_ext)
-    		{
-    			for (i=0; i<types_ext[prop].length; i++)
-    				if (types_ext[prop][i]== ext)
-    					return prop;
-    		}
-    		return "php";
-    	}
-		</script>
+		function getModeFromFile(filename)
+		{
+			filename=filename.substring(filename.lastIndexOf(".")+1, filename.length).toLowerCase();
+			for (prop in types_ext)
+				for (i=0; i<types_ext[prop].length; i++)
+					if (types_ext[prop][i]== filename)
+						return prop;
+			return "php";
+		}
+	</script>
 		<style type="text/css">
 		input {
 			display: inline;
@@ -406,6 +548,14 @@ else if(isset($_GET['curpos']))
 		}
 		body {
 			overflow: hidden;
+			font-family: tahoma;
+		}
+		html, body {
+			height: 100%;
+		}
+		#content {
+			width: 100%;
+			height: 100%;
 		}
 		#editor {
 			margin: 0;
@@ -414,6 +564,13 @@ else if(isset($_GET['curpos']))
 			bottom: 0;
 			left: 0;
 			right: 0;
+		}
+		#message {
+			font-family: monospace;
+			margin-left: 10px;
+		}
+		#loading {
+			display:none;
 		}
 		.ui-autocomplete {
 			max-height: 600px;
@@ -432,18 +589,20 @@ else if(isset($_GET['curpos']))
 		</style>
 	</head>
 	<body onload="Init();">
-		<form id="formfile" name="formfile" method="post" action="<?php echo $url_script;?>" onsubmit="onsavecode();">
+		<form id="formfile" name="formfile" method="post" action="<?php echo $url_script;?>" onsubmit="return false;">
 			<input type="hidden" name="password" id="password" value="<?php echo $password;?>"/>
-			<input type="hidden" name="oper" id="oper" value="0"/>
-			<input type="hidden" name="curpos" id="curpos" value="<?php echo $curpos;?>"/>
-			<input type="text" name="file" id="file" value="<?php echo $file;?>"/>
-			<?php echo $newfile==TRUE?" *":"";?><a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
-			<input type="submit" name="button" id="button" value="load/save" />
-			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()">backup</button>
-			<button name="delbtn" id="delbtn" onclick="dodelete()">delete</button>
-			<button name="renbtn" id="renbtn" onclick="dorename()">rename</button>
+			<input type="text" name="file" id="file" value="<?php echo $file;?>" autofocus/>
+			<a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
+			<button name="loadbtn" id="loadbtn" onclick="doload()" disabled>load</button>
+			<button name="savebtn" id="savebtn" onclick="dosave()" disabled>save</button>
+			<button name="bkpbtn" id="bkpbtn" onclick="dobackup()" disabled>backup</button>
+			<button name="delbtn" id="delbtn" onclick="dodelete()" disabled>delete</button>
+			<button name="renbtn" id="renbtn" onclick="dorename()" disabled>rename</button>
+			<span id="loading" style="display:none;">Loading...</span>
+			<span id="message"></span>
 			<textarea name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
 		</form>
 		<div id="editor"><?php echo htmlspecialchars($content);?></div>
+		<div id="spinner"></div>
 	</body>
 </html>
