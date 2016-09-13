@@ -56,9 +56,19 @@ else if(isset($_GET['file']))
 $content='';
 if (strlen(trim($file)) > 0 && @file_exists($file) && !@is_dir($file))
 {
-	$opts = array('http' => array('header' => 'Accept-Charset: UTF-8, *;q=0'));
-	$context = stream_context_create($opts);
-	$content = file_get_contents($file, false, $context);
+	$fc = file_get_contents($file);
+	$fenc = mb_detect_encoding($fc);
+	if (strtolower($fenc) != 'utf-8')
+		$fc = iconv(/*'windows-1250'*/$fenc, 'utf-8', file_get_contents($file));
+	$handle = fopen("php://memory", "rw");
+	fwrite($handle, $fc);
+	fseek($handle, 0);
+	$content = fread($handle,filesize($file));
+	// remove BOM https://fr.wikipedia.org/wiki/Indicateur_d%27ordre_des_octets
+	if (substr($content, 0, 3) == chr(0xef).chr(0xbb).chr(0xbf))
+		$content = substr($content, 3);
+	else if (substr($content, 0, 2) == chr(0xfe).chr(0xff))
+		$content = substr($content, 2);
 }
 
 $operation='';
@@ -67,11 +77,13 @@ if(isset($_POST['operation']))
 else if(isset($_GET['operation']))
 	$operation = htmlspecialchars($_GET['operation']);
 
-
 if ($operation=="load")
 {
 //sleep(3);
-	echo json_encode(["status"=>"ok", "message"=> "", "content"=> $content]);
+	if (!file_exists($file) || !is_file($file))
+		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." isn't a file"]);
+	else
+		echo json_encode(["status"=>"ok", "message"=> "", "content"=> $content]);
 	exit(0);
 }
 else if ($operation=="save")
@@ -91,7 +103,7 @@ else if ($operation=="save")
 }
 else if ($operation=="backup")
 {
-	$today =getdate();
+	$today=getdate();
 	if (is_file($file))
 	{
 		copy($file, $file.".".$today['0']);
@@ -280,7 +292,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			$(document).ajaxStart(function() {if (show_loading){toggle_btns(true);loading(true);}});
 			$(document).ajaxStop(function() {toggle_btns(false);loading(false);});
 			$( document ).ajaxError(function( event, jqxhr, settings, thrownError ) {
-				show_message( "Error while posting!!! Server down?", true );
+				show_message( "Error while retrieving server content!!! Server down?", true );
 			});
 			initspinner();
 		}
