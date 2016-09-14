@@ -105,37 +105,11 @@ else if ($operation=="save")
 	else
 		$content = $_POST['content'];
 	$fenc = mb_detect_encoding($content);
-	/*echo $fenc."\r\n";
-	echo $content."\r\n";*/
 	$content = iconv($fenc, 'utf-8', $content);
-	/*echo $content."\r\n";*/
-	//$content = utf8_encode($content);
-	//echo $content."\r\n";
 	if (@file_put_contents($file, $content))
 		echo json_encode(["status"=>"ok", "message"=> "file saved."]);
 	else
 		echo json_encode(["status"=>"ko", "message"=> "unable to save file."]);
-
-
-	/*$fc = file_get_contents($file);
-	$fenc = mb_detect_encoding($fc);
-	echo $fenc."\r\n";
-	echo $content."\r\n";
-	if (strtolower($fenc) != 'utf-8')
-		$fc = iconv($fenc, 'utf-8', file_get_contents($file));
-	echo $content."\r\n";
-	$handle = fopen("php://memory", "rw");
-	fwrite($handle, $fc);
-	fseek($handle, 0);
-	$content = fread($handle,filesize($file));
-	// remove BOM https://fr.wikipedia.org/wiki/Indicateur_d%27ordre_des_octets
-	if (substr($content, 0, 3) == chr(0xef).chr(0xbb).chr(0xbf))
-		$content = substr($content, 3);
-	else if (substr($content, 0, 2) == chr(0xfe).chr(0xff))
-		$content = substr($content, 2);
-	echo $content."\r\n";
-echo "pouet.";*/
-
 	exit(0);
 }
 else if ($operation=="checkfile")
