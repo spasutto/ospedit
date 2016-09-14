@@ -79,7 +79,7 @@ else if(isset($_GET['operation']))
 
 if ($operation=="load")
 {
-sleep(3);
+//sleep(3);
 	if (!file_exists($file) || !is_file($file))
 		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." isn't a file"]);
 	else
@@ -374,7 +374,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		function initspinner()
 		{
 			if (typeof Spinner !== "object" && typeof Spinner !== "function")
-			window.Spinner = function(){this.spin=function (){div_loading.show();};this.stop=function (){div_loading.hide();};};
+				window.Spinner = function(){this.spin=function (){div_loading.show();};this.stop=function (){div_loading.hide();};};
 			var opts = {
 			 color: '#7FB900'//F2
 			}
