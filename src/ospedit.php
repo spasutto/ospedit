@@ -246,7 +246,6 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ext-modelist.js" type="text/javascript" charset="utf-8"></script>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
-		<script src="//cdnjs.cloudflare.com/ajax/libs/require.js/2.3.1/require.min.js" type="text/javascript" charset="utf-8"></script>
 		<script type="text/javascript">
 		var editor = null;
 		var disableedit = <?php echo $disableedit==TRUE?"true":"false";?>;
