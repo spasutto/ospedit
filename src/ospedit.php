@@ -83,22 +83,30 @@ if ($operation=="load")
 	if (!file_exists($file) || !is_file($file))
 		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." isn't a file"]);
 	else
-		echo json_encode(["status"=>"ok", "message"=> "", "content"=> $content]);
+		echo json_encode(["status"=>"ok", "message"=> "", "content"=> utf8_encode($content)]);
 	exit(0);
 }
 else if ($operation=="save")
 {
-	if (true/*file_exists($file)*/)
+	$dirfile = dirname($file);
+	if (!file_exists($dirfile))
+		mkdir($dirfile, 0755, true); // $path is a file
+	if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
 	{
-		if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
-		{
-			$content = $_POST['content'];
-			if (file_put_contents($file, htmlspecialchars_decode($content)))
-				echo json_encode(["status"=>"ok", "message"=> "file saved."]);
-		}
+		$content = $_POST['content'];
+		if (file_put_contents($file, htmlspecialchars_decode($content)))
+			echo json_encode(["status"=>"ok", "message"=> "file saved."]);
 	}
 	else
 		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
+	exit(0);
+}
+else if ($operation=="checkfile")
+{
+	if (is_file($file))
+		echo json_encode(["status"=>"exists"]);
+	else
+		echo json_encode(["status"=>"nexists"]);
 	exit(0);
 }
 else if ($operation=="backup")
@@ -115,12 +123,18 @@ else if ($operation=="backup")
 }
 else if ($operation=="delete")
 {
-	if (is_file($file))
+	if (file_exists($file))
 	{
-		if (unlink($file))
+		if ((is_dir($file) && @rmdir($file)) || (is_file($file) && @unlink($file)))
 			echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." removed."]);
 		else
-			echo json_encode(["status"=>"ko", "message"=> "error while removing ".$file]);
+		{
+			$message = "error while removing ".$file;
+			$error = error_get_last()['message'];
+			if ($error && strlen($error) > 0)
+				$message .= " : ".$error;
+			echo json_encode(["status"=>"ko", "message"=> $message]);
+		}
 	}
 	else
 		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
@@ -229,6 +243,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		<script src="//code.jquery.com/jquery-1.12.3.min.js" type="text/javascript"></script>
 		<script src="//code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ace.js" type="text/javascript" charset="utf-8"></script>
+		<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.2.5/ext-modelist.js" type="text/javascript" charset="utf-8"></script>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
 		<script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
 		<script type="text/javascript">
@@ -302,10 +317,13 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			{
 				window.editor = ace.edit("editor");
 				window.editor.setTheme("ace/theme/twilight");
-				window.editor.session.setMode("ace/mode/" + getModeFromFile($("#file").val()));
+				var modelist = ace.require("ace/ext/modelist");
+				var mode = modelist.getModeForPath($("#file").val()).mode;
+				console.log("editor set mode " + mode);
+				window.editor.session.setMode(mode);
 				window.editor.on("input", function() {
 					has_changes = !window.editor.session.getUndoManager().isClean();
-					/*redraw_btns*/toggle_btns();
+					toggle_btns();
 				});
 			}
 			else
@@ -316,12 +334,12 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 					var origvalue = this.value, self = this;
 					timer = setTimeout(function(){
 						has_changes = ( origvalue !== self.value );
-						/*redraw_btns*/toggle_btns();
+						toggle_btns();
 					},0);
 				});
 			}
 			has_changes = false;
-			/*redraw_btns*/toggle_btns();
+			toggle_btns();
 		}
 		function initcatcomplete()
 		{
@@ -377,15 +395,11 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			else
 				spinner.stop();
 		}
-		function redraw_btns()
-		{
-			$("#savebtn")[0].disabled = !has_changes;
-		}
 		function toggle_btns(bdisable)
 		{
 			var is_file_selected = $.trim($("#file").val()).length > 0;
 			$("#loadbtn")[0].disabled = !is_file_selected || bdisable;
-			$("#savebtn")[0].disabled = !has_changes || bdisable;
+			$("#savebtn")[0].disabled = !is_file_selected || bdisable;
 			$("#bkpbtn")[0].disabled = !is_file_selected || bdisable;
 			$("#delbtn")[0].disabled = !is_file_selected || bdisable;
 			$("#renbtn")[0].disabled = !is_file_selected || bdisable;
@@ -459,18 +473,40 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		function dosave()
 		{
 			var filecontent = $('#content').val();
+			var filename = $("#file").val();
 			if (!disableedit)
 				filecontent = editor.getSession().getValue();
-			if (!disableedit)
-			{
-				editor.session.getUndoManager().markClean();
-				$("#savebtn")[0].disabled = editor.session.getUndoManager().isClean()
-			}
 			show_loading = true;
-			$.post( url_script,
-				{ password: $("#password").val(), operation: "save", file: $("#file").val(), content: filecontent },
-				function( data ) { data = trygetdata(data, true);if (data.status == "ok") has_changes = false; }
-			);
+			var savepost = function()
+			{
+				$.post( url_script,
+					{ password: $("#password").val(), operation: "save", file: filename, content: filecontent },
+					function( data )
+					{
+						data = trygetdata(data, true);
+						if (data.status == "ok")
+						{
+							has_changes = false;
+							if (!disableedit)
+								editor.session.getUndoManager().markClean();
+						}
+					}
+				);
+			};
+			if (filename == current_file)
+				savepost();
+			else
+			{
+				$.post( url_script,
+					{ password: $("#password").val(), operation: "checkfile", file: filename },
+					function( data )
+					{
+						data = trygetdata(data, true);
+						if (data.status != "exists" || confirm("Warning, \"" + filename + "\" already exists, overwrite?"))
+							savepost();
+					}
+				);
+			}
 			return true;
 		}
 		function dobackup()
@@ -522,15 +558,6 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				}
 			);
 			return false;
-		}
-		function getModeFromFile(filename)
-		{
-			filename=filename.substring(filename.lastIndexOf(".")+1, filename.length).toLowerCase();
-			for (prop in types_ext)
-				for (i=0; i<types_ext[prop].length; i++)
-					if (types_ext[prop][i]== filename)
-						return prop;
-			return "php";
 		}
 	</script>
 		<style type="text/css">
