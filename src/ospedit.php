@@ -91,14 +91,14 @@ else if ($operation=="save")
 	$dirfile = dirname($file);
 	if (!file_exists($dirfile))
 		mkdir($dirfile, 0755, true); // $path is a file
-	if(isset($_POST['content']) && strlen(trim($_POST['content']))>0)
-	{
-		$content = $_POST['content'];
-		if (file_put_contents($file, htmlspecialchars_decode($content)))
-			echo json_encode(["status"=>"ok", "message"=> "file saved."]);
-	}
+	if(!isset($_POST['content']))
+		$content = "";
 	else
-		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
+		$content = $_POST['content'];
+	if (@file_put_contents($file, htmlspecialchars_decode($content)))
+		echo json_encode(["status"=>"ok", "message"=> "file saved."]);
+	else
+		echo json_encode(["status"=>"ko", "message"=> "unable to save file."]);
 	exit(0);
 }
 else if ($operation=="checkfile")
