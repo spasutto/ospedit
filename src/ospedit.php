@@ -109,7 +109,13 @@ else if ($operation=="save")
 	if (@file_put_contents($file, $content))
 		echo json_encode(["status"=>"ok", "message"=> "file saved."]);
 	else
-		echo json_encode(["status"=>"ko", "message"=> "unable to save file."]);
+	{
+		$message = "unable to save file \"".$file."\"";
+		$error = @error_get_last()['message'];
+		if ($error && strlen($error) > 0)
+			$message .= " : ".$error;
+		echo json_encode(["status"=>"ko", "message"=> $message]);
+	}
 	exit(0);
 }
 else if ($operation=="checkfile")
@@ -123,10 +129,19 @@ else if ($operation=="checkfile")
 else if ($operation=="backup")
 {
 	$today=getdate();
+	$newfile = $file.".".$today['0'];
 	if (is_file($file))
 	{
-		copy($file, $file.".".$today['0']);
-		echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." backuped in ".$file.".".$today['0']]);
+		if (@copy($file, $newfile))
+			echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." backuped in \"".$newfile."\""]);
+		else
+		{
+			$message = "error while copying \"".$file."\" to \"".$newfile."\"";
+			$error = @error_get_last()['message'];
+			if ($error && strlen($error) > 0)
+				$message .= " : ".$error;
+			echo json_encode(["status"=>"ko", "message"=> $message]);
+		}
 	}
 	else
 		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." doesn't exists"]);
@@ -140,8 +155,8 @@ else if ($operation=="delete")
 			echo json_encode(["status"=>"ok", "message"=> "\"".$file."\""." removed."]);
 		else
 		{
-			$message = "error while removing ".$file;
-			$error = error_get_last()['message'];
+			$message = "error while removing \"".$file."\"";
+			$error = @error_get_last()['message'];
 			if ($error && strlen($error) > 0)
 				$message .= " : ".$error;
 			echo json_encode(["status"=>"ko", "message"=> $message]);
@@ -164,8 +179,16 @@ else if ($operation=="rename")
 		echo json_encode(["status"=>"ko", "message"=> "\"".$file."\""." already exists"]);
 	else
 	{
-		rename($oldfile, $file);
-		echo json_encode(["status"=>"ok", "message"=> "\"".$oldfile."\""." renamed to ".$file]);
+		if (@rename($oldfile, $file))
+			echo json_encode(["status"=>"ok", "message"=>"\"".$oldfile."\""." renamed to \"".$file."\""]);
+		else
+		{
+			$message = "error while renaming \"".$oldfile."\""." to \"".$file."\"";
+			$error = @error_get_last()['message'];
+			if ($error && strlen($error) > 0)
+				$message .= " : ".$error;
+			echo json_encode(["status"=>"ko", "message"=> $message]);
+		}
 	}
 	exit(0);
 }
