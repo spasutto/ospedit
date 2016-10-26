@@ -567,7 +567,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 						if (confirm("Go to new file"+(has_changes?" (changes will not be saved)":"")+"?"))
 						{
 							$("#file").val(newfile);
-							$("#formfile").submit();
+							doload();//$("#formfile").submit();
 						}
 					}
 				}
