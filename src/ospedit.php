@@ -63,7 +63,10 @@ if (strlen(trim($file)) > 0 && @file_exists($file) && !@is_dir($file))
 	$handle = fopen("php://memory", "rw");
 	fwrite($handle, $fc);
 	fseek($handle, 0);
-	$content = fread($handle,filesize($file));
+	$fsize = filesize($file);
+	$content = "";
+	if ($fsize > 0)
+		$content = fread($handle,$fsize);
 	// remove BOM https://fr.wikipedia.org/wiki/Indicateur_d%27ordre_des_octets
 	if (substr($content, 0, 3) == chr(0xef).chr(0xbb).chr(0xbf))
 		$content = substr($content, 3);
