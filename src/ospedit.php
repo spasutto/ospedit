@@ -109,7 +109,7 @@ else if ($operation=="save")
 		$content = $_POST['content'];
 	$fenc = mb_detect_encoding($content);
 	$content = iconv($fenc, 'utf-8', $content);
-	if (@file_put_contents($file, $content))
+	if (@file_put_contents($file, $content) !== FALSE)
 		echo json_encode(["status"=>"ok", "message"=> "file saved."]);
 	else
 	{
@@ -183,7 +183,7 @@ else if ($operation=="rename")
 	else
 	{
 		if (@rename($oldfile, $file))
-			echo json_encode(["status"=>"ok", "message"=>"\"".$oldfile."\""." renamed to \"".$file."\""]);
+			echo json_encode(["status"=>"ok", "message"=>"\"".$oldfile."\""." renamed to \"".$file."\"", "folder"=>is_dir($file)?"1":"0"]);
 		else
 		{
 			$message = "error while renaming \"".$oldfile."\""." to \"".$file."\"";
@@ -225,8 +225,11 @@ if (strlen(trim($searchterm))>0)
 	//echo '[{"id":"Somateria mollissima","label":"Common Eider","value":"Common Eider"},{"id":"Circus pygargus","label":"Montagu`s Harrier","value":"Montagu`s Harrier"}]';
 	echo '[';
 	$i=0;
-	if (!@is_dir($rep))
+	//if (!@is_dir($rep))
+	if (strlen(trim($rep)) <= 0)
 		$rep = ".";
+	$scans = array();
+	if (@is_dir($rep))
 	$scans = @scandir($rep);
 	$filestotal = array();
 	foreach($scans as $scan)
@@ -274,7 +277,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 <html>
 	<head>
 		<meta http-equiv="content-type" content="text/html; charset=utf-8">
-		<title>OSPEdit v0.2</title>
+		<title>OSPEdit v0.3</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
 		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 		<script src="//code.jquery.com/jquery-1.12.3.min.js" type="text/javascript"></script>
@@ -565,7 +568,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 				function( data )
 				{
 					data = trygetdata(data, true);
-					if (data.status == "ok")
+					if (data.status == "ok" && data.folder!="1")
 					{
 						if (confirm("Go to new file"+(has_changes?" (changes will not be saved)":"")+"?"))
 						{
