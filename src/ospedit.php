@@ -506,8 +506,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 					{
 						data = trygetdata(data, true);
 						if (data.status == "ok")
-						{
+						{							
 							has_changes = false;
+							current_file = filename;
 							if (!disableedit)
 								editor.session.getUndoManager().markClean();
 						}
