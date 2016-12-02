@@ -100,9 +100,17 @@ if ($operation=="load")
 }
 else if ($operation=="save")
 {
+    $lastchar = substr(trim($file), -1);
 	$dirfile = dirname($file);
 	if (!file_exists($dirfile))
 		mkdir($dirfile, 0755, true);
+	//if (strlen($content)<=0 && strlen(trim(basename($file))) == 0)
+	if ($lastchar == "/" || $lastchar == "\\")
+	{
+	    mkdir($file, 0755, true);
+	    echo json_encode(["status"=>"ok", "message"=> "directory ".$file." created"]);
+	    exit(0);
+	}
 	if(!isset($_POST['content']))
 		$content = "";
 	else
@@ -277,7 +285,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 <html>
 	<head>
 		<meta http-equiv="content-type" content="text/html; charset=utf-8">
-		<title>OSPEdit v0.3</title>
+		<title>OSPEdit v0.31</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
 		<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 		<script src="//code.jquery.com/jquery-1.12.3.min.js" type="text/javascript"></script>
@@ -507,8 +515,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 						data = trygetdata(data, true);
 						if (data.status == "ok")
 						{							
+						    current_file = filename;
 							has_changes = false;
-							current_file = filename;
 							if (!disableedit)
 								editor.session.getUndoManager().markClean();
 						}
