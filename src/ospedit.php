@@ -338,8 +338,13 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 							doload();
 						},0);
 					}
-					//else
-					//	setTimeout(function(){ $("#file").autocomplete('search', ui.item.value); }, 1000);
+					else {
+					    setTimeout(function(){
+    					    atc = $(this);
+    					    atc.data("ui-autocomplete", atc.data("customCatcomplete"));
+    						atc.autocomplete('search',  ui.item.value);
+					    }.bind(this), 0);
+					}
 				}
 			});
 			$( "#file" ).on("keyup paste cut", function(){toggle_btns();});
