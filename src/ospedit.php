@@ -284,6 +284,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 	<head>
+	    <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 		<meta http-equiv="content-type" content="text/html; charset=utf-8">
 		<title>OSPEdit v0.31</title>
 		<link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
@@ -602,8 +603,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		a#filelink {
 			margin: 0px 20px;
 		}
-		input#button {
-			margin: 0px 20px;
+		#file {
+		  width: 60%;
 		}
 		textarea {
 			/*display: none;*/
@@ -615,17 +616,22 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		html, body {
 			height: 100%;
 		}
-		#content {
-			width: 100%;
-			height: 100%;
-		}
-		#editor {
+		.content {
 			margin: 0;
 			position: absolute;
+			bottom: 0px;
+			left: 0px;
+			right: 0px;
+		}
+		@media (min-width:840px) {
+		  .content {
 			top: 40px;
-			bottom: 0;
-			left: 0;
-			right: 0;
+		  }
+		}
+		@media (max-width:840px) {
+		  .content {
+			top: 55px;
+		  }
 		}
 		#message {
 			font-family: monospace;
@@ -662,9 +668,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			<button name="renbtn" id="renbtn" onclick="dorename()" disabled>rename</button>
 			<span id="loading" style="display:none;">Loading...</span>
 			<span id="message"></span>
-			<textarea name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
+			<textarea class="content" name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
 		</form>
-		<div id="editor"><?php echo htmlspecialchars($content);?></div>
+		<div id="editor" class="content"><?php echo htmlspecialchars($content);?></div>
 		<div id="spinner"></div>
 	</body>
 </html>
