@@ -654,6 +654,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 			font-weight: bold;
 			color : rgb(255,153,0);
 		}
+		.ui-menu-item-folder .ui-state-active {
+			font-weight: bold !important;
+		}
 		</style>
 	</head>
 	<body onload="Init();">
