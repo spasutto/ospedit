@@ -214,7 +214,7 @@ if(isset($_POST['term']))
 	$searchterm = htmlspecialchars($_POST['term']);
 else if(isset($_GET['term']))
 	$searchterm = htmlspecialchars($_GET['term']);
-if (strlen(trim($searchterm))>0)
+if (strlen(/*trim*/($searchterm))>0)
 {
 //sleep(1);
 	$rep = '';
@@ -230,7 +230,6 @@ if (strlen(trim($searchterm))>0)
 			$searchterm = trim(substr($searchterm, $islash+1));
 		}
 	}
-	//echo '[{"id":"Somateria mollissima","label":"Common Eider","value":"Common Eider"},{"id":"Circus pygargus","label":"Montagu`s Harrier","value":"Montagu`s Harrier"}]';
 	echo '[';
 	$i=0;
 	//if (!@is_dir($rep))
@@ -240,9 +239,10 @@ if (strlen(trim($searchterm))>0)
 	if (@is_dir($rep))
 	$scans = @scandir($rep);
 	$filestotal = array();
+	if ($scans)
 	foreach($scans as $scan)
 	{
-		if (!fnmatch($searchterm."*", $scan, FNM_CASEFOLD))
+		if ($scan == "." || ($scan == ".." && $islash) || !fnmatch($searchterm."*", $scan, FNM_CASEFOLD))
 			continue;
 		$filescan = $scan;
 		//if (trim($searchterm) != "." && trim($searchterm) == "..")
@@ -605,9 +605,6 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
 		}
 		#file {
 		  width: 60%;
-		}
-		textarea {
-			/*display: none;*/
 		}
 		body {
 			overflow: hidden;
