@@ -119,7 +119,7 @@ else if ($operation=="save")
   $content = iconv($fenc, 'utf-8', $content);
   $backup = isset($_POST['backup']) && ($_POST['backup'] == '1' || strtolower($_POST['backup']) == 'true');
   if (@file_put_contents($file, $content) !== FALSE)
-    echo json_encode(["status"=>"ok", "message"=> "file ".($backup?"backuped":"saved")]);
+    echo json_encode(["status"=>"ok", "message"=> "file ".($backup?"backuped to ".$file:"saved")]);
   else
   {
     $message = "unable to save file \"".$file."\"";
@@ -514,7 +514,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
           function( data )
           {
             data = trygetdata(data, true);
-            if (data.status == "ok")
+            if (data.status == "ok" && !backup)
             {
               current_file = filename;
               has_changes = false;
