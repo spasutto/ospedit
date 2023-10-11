@@ -58,8 +58,10 @@ if (strlen(trim($file)) > 0 && @file_exists($file) && !@is_dir($file))
 {
   $fc = file_get_contents($file);
   $fenc = mb_detect_encoding($fc);
-  if (strtolower($fenc) != 'utf-8')
-    $fc = iconv(/*'windows-1250'*/$fenc, 'utf-8', file_get_contents($file));
+  if ($fenc && strtolower($fenc) != 'utf-8') {
+    $fc2 = iconv(/*'windows-1250'*/$fenc, 'utf-8', $fc);
+    if ($fc2) $fc = $fc2;
+  }
   $handle = fopen("php://memory", "rw");
   fwrite($handle, $fc);
   fseek($handle, 0);
@@ -269,10 +271,10 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     <title>OSPEdit v0.31</title>
     <link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
-    <script src="//code.jquery.com/jquery-1.12.3.min.js" type="text/javascript"></script>
+    <script src="//code.jquery.com/jquery-1.12.3.js" type="text/javascript"></script>
     <script src="//code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.14.0/ace.js" type="text/javascript" charset="utf-8"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.14.0/ext-modelist.js" type="text/javascript" charset="utf-8"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js" type="text/javascript" charset="utf-8"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ext-modelist.js" type="text/javascript" charset="utf-8"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
     <script type="text/javascript">
@@ -298,8 +300,10 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       div_message = $("#message");
       div_message.click(function(){$(this).html('');});
       disableedit = disableedit || /*is_touch_device() || */typeof ace != "object";
-      if (!disableedit)
+      if (!disableedit) {
+        initmodechooser();
         $('#content').hide();
+      }
       else
         $('#editor').hide();
       initeditor();
@@ -345,14 +349,16 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       });
       initspinner();
     }
-    function initeditor()
+    function initeditor(mode)
     {
       if (!disableedit)
       {
         window.editor = ace.edit("editor");
         window.editor.setTheme("ace/theme/twilight");
-        var modelist = ace.require("ace/ext/modelist");
-        var mode = modelist.getModeForPath($("#file").val()).mode;
+        if (!mode) {
+          mode = modelist.getModeForPath($("#file").val()).mode;
+          document.getElementById('modechooser').value = mode;
+        }
         console.log("editor set mode " + mode);
         window.editor.session.setMode(mode);
         window.editor.session.setOptions({
@@ -407,6 +413,21 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       }
       spinner = new Spinner(opts);
     }
+    function initmodechooser() {
+      window.modelist = window.modelist || ace.require("ace/ext/modelist");
+      let modechooser = document.getElementById('modechooser');
+      let modechooserlbl = document.getElementById('modechooserlbl');
+      modelist.modes.forEach(mode => {
+        var opt = document.createElement('option');
+        opt.value = mode.mode;
+        opt.innerHTML = mode.caption;
+        modechooser.appendChild(opt);
+      });
+    }
+    function setmode(value) {
+      let mode = modelist.modes.find(m => m.mode == value);
+      initeditor(mode.mode);
+    }
     function loading(bloading)
     {
       if (bloading)
@@ -422,6 +443,13 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       $("#bkpbtn")[0].disabled = !is_file_selected || bdisable;
       $("#delbtn")[0].disabled = !is_file_selected || bdisable;
       $("#renbtn")[0].disabled = !is_file_selected || bdisable;
+      if (bdisable || (disableedit || !is_file_selected)) {
+        modechooserlbl.classList.add('invisible');
+        modechooser.classList.add('invisible');
+      } else {
+        modechooserlbl.classList.remove('invisible');
+        modechooser.classList.remove('invisible');
+      }
     }
     function is_touch_device()
     {
@@ -591,7 +619,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       margin: 0px 20px;
     }
     #file {
-      width: 60%;
+      width: 50%;
     }
     body {
       overflow: hidden;
@@ -641,6 +669,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     .ui-menu-item-folder .ui-state-active {
       font-weight: bold !important;
     }
+    .invisible {
+      display: none;
+    }
     </style>
   </head>
   <body onload="Init();">
@@ -653,6 +684,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       <button name="bkpbtn" id="bkpbtn" onclick="dobackup()" disabled>backup</button>
       <button name="delbtn" id="delbtn" onclick="dodelete()" disabled>delete</button>
       <button name="renbtn" id="renbtn" onclick="dorename()" disabled>rename</button>
+      <label id="modechooserlbl" for="modechooser" class="invisible">language : </label><select name="modechooser" id="modechooser" onchange="setmode(this.value)" class="invisible"></select>
       <span id="loading" style="display:none;">Loading...</span>
       <span id="message"></span>
       <textarea class="content" name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
