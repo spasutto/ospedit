@@ -230,23 +230,23 @@ if (strlen(/*trim*/($searchterm))>0)
     //if (trim($searchterm) != "." && trim($searchterm) == "..")
       $filescan = $rep."/".$scan;
     if (is_dir($filescan))
-      $filestotal[] = array("type" => "folder" , "value"=> $filescan."/" , "time" => filemtime($filescan));
+      $filestotal[] = array("type" => "folder" , "name"=> $scan , "value"=> $filescan."/" , "time" => filemtime($filescan));
     else
-      $filestotal[] = array("type"=> "file" , "value"=> $filescan , "time" => filemtime($filescan));
+      $filestotal[] = array("type"=> "file" , "name"=> $scan , "value"=> $filescan , "time" => filemtime($filescan));
   }
   $arrayLength = count($filestotal);
   for ($j = 0; $j < $arrayLength; $j++)
   {
     if ($filestotal[$j]["type"] != "folder") continue;
     if ($i>0) echo ",";
-    echo '{"type":"folder","value":"'.$filestotal[$j]["value"].'","time":'.$filestotal[$j]["time"].'}';
+    echo '{"type":"folder","name":"'.$filestotal[$j]["name"].'","value":"'.$filestotal[$j]["value"].'","time":'.$filestotal[$j]["time"].'}';
     $i++;
   }
   for ($j = 0; $j < $arrayLength; $j++)
   {
     if ($filestotal[$j]["type"] != "file") continue;
     if ($i>0) echo ",";
-    echo '{"type":"file","value":"'.$filestotal[$j]["value"].'","time":'.$filestotal[$j]["time"].'}';
+    echo '{"type":"file","name":"'.$filestotal[$j]["name"].'","value":"'.$filestotal[$j]["value"].'","time":'.$filestotal[$j]["time"].'}';
     $i++;
   }
   echo ']';
@@ -404,6 +404,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
             if ( item.type == "folder")
               li.addClass("ui-menu-item-folder");
             li.children('div')[0].style.display='inline-block';
+            li.children('div')[0].innerHTML = item.name;
             li.append($('<span style="float:right" title="date de dernière modification"/>').append((new Date(item.time*1000)).toLocaleString()));
           });
         }
