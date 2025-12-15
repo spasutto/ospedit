@@ -2,7 +2,7 @@
 /*
 MIT License
 
-Copyright (c) 2016 Sylvain PASUTTO
+Copyright (c) 2016-2025 Sylvain PASUTTO
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -232,7 +232,7 @@ if (strlen(/*trim*/($searchterm))>0)
     if (is_dir($filescan))
       $filestotal[] = array("type" => "folder" , "name"=> $scan , "value"=> $filescan."/" , "time" => filemtime($filescan));
     else
-      $filestotal[] = array("type"=> "file" , "name"=> $scan , "value"=> $filescan , "time" => filemtime($filescan));
+      $filestotal[] = array("type"=> "file" , "name"=> $scan , "value"=> $filescan , "time" => filemtime($filescan) , "size" => filesize($filescan));
   }
   $arrayLength = count($filestotal);
   for ($j = 0; $j < $arrayLength; $j++)
@@ -246,7 +246,7 @@ if (strlen(/*trim*/($searchterm))>0)
   {
     if ($filestotal[$j]["type"] != "file") continue;
     if ($i>0) echo ",";
-    echo '{"type":"file","name":"'.$filestotal[$j]["name"].'","value":"'.$filestotal[$j]["value"].'","time":'.$filestotal[$j]["time"].'}';
+    echo '{"type":"file","name":"'.$filestotal[$j]["name"].'","value":"'.$filestotal[$j]["value"].'","time":'.$filestotal[$j]["time"].',"size":'.$filestotal[$j]["size"].'}';
     $i++;
   }
   echo ']';
@@ -327,11 +327,11 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
             },0);
           }
           else {
-              setTimeout(function(){
-                  atc = $(this);
-                  atc.data("ui-autocomplete", atc.data("customCatcomplete"));
-                atc.autocomplete('search',  ui.item.value);
-              }.bind(this), 0);
+            setTimeout(function(){
+              atc = $(this);
+              atc.data("ui-autocomplete", atc.data("customCatcomplete"));
+              atc.autocomplete('search',  ui.item.value);
+            }.bind(this), 0);
           }
         }
       });
@@ -388,6 +388,10 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       has_changes = false;
       toggle_btns();
     }
+    function humanFileSize(size) {
+      var i = size == 0 ? 0 : Math.floor(Math.log(size) / Math.log(1024));
+      return +((size / Math.pow(1024, i)).toFixed(2)) * 1 + ' ' + ['', 'k', 'M', 'G', 'T'][i] + 'o';
+    }
     function initcatcomplete()
     {
       $.widget( "custom.catcomplete", $.ui.autocomplete,
@@ -406,6 +410,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
             li.children('div')[0].style.display='inline-block';
             li.children('div')[0].innerHTML = item.name;
             li.append($('<span style="float:right" title="date de dernière modification"/>').append((new Date(item.time*1000)).toLocaleString()));
+            if ( item.type !== "folder")
+              li.append($('<span style="float:right" title="taille du fichier"/>').append(humanFileSize(item.size)));
           });
         }
       });
@@ -678,6 +684,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     .invisible {
       display: none;
     }
+    .clickable {
+      cursor: pointer;
+    }
     </style>
   </head>
   <body onload="Init();">
@@ -690,6 +699,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       <button name="bkpbtn" id="bkpbtn" onclick="dobackup()" disabled>backup</button>
       <button name="delbtn" id="delbtn" onclick="dodelete()" disabled>delete</button>
       <button name="renbtn" id="renbtn" onclick="dorename()" disabled>rename</button>
+      <input type="checkbox" id="cb_wordwrap" class="clickable" title="word wrap" onchange="editor.session.setUseWrapMode(this.checked);"><label class="clickable" title="word wrap" for="cb_wordwrap">&#8626;</label>
       <label id="modechooserlbl" for="modechooser" class="invisible">language : </label><select name="modechooser" id="modechooser" onchange="setmode(this.value)" class="invisible"></select>
       <span id="loading" style="display:none;">Loading...</span>
       <span id="message"></span>
