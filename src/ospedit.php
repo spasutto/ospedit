@@ -2,7 +2,7 @@
 /*
 MIT License
 
-Copyright (c) 2016-2025 Sylvain PASUTTO
+Copyright (c) 2016-2026 Sylvain PASUTTO
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -271,10 +271,11 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     <title>OSPEdit v0.31</title>
     <link rel="stylesheet" href="//code.jquery.com/ui/1.12.0/themes/base/jquery-ui.css">
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ace-builds@1.43.6/css/ace.min.css">
     <script src="//code.jquery.com/jquery-1.12.3.js" type="text/javascript"></script>
     <script src="//code.jquery.com/ui/1.12.0/jquery-ui.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ace.js" type="text/javascript" charset="utf-8"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.23.4/ext-modelist.js" type="text/javascript" charset="utf-8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.43.6/src-min-noconflict/ace.min.js" type="text/javascript" charset="utf-8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.43.6/src-min-noconflict/ext-modelist.js" type="text/javascript" charset="utf-8"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
     <script type="text/javascript">
@@ -352,6 +353,17 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       });
       initspinner();
     }
+    function beforeUnloadHandler(event) {
+      event.preventDefault();
+      // Included for legacy support, e.g. Chrome/Edge < 119
+      event.returnValue = true;
+    }
+    function updateUnloadEvent() {
+      if (has_changes)
+        window.addEventListener("beforeunload", beforeUnloadHandler);
+      else
+        window.removeEventListener("beforeunload", beforeUnloadHandler);
+    }
     function initeditor(mode)
     {
       if (!disableedit)
@@ -370,6 +382,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
         });
         window.editor.on("input", function() {
           has_changes = !window.editor.session.getUndoManager().isClean();
+          updateUnloadEvent();
           toggle_btns();
         });
       }
@@ -381,11 +394,13 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
           var origvalue = this.value, self = this;
           timer = setTimeout(function(){
             has_changes = ( origvalue !== self.value );
+            updateUnloadEvent();
             toggle_btns();
           },0);
         });
       }
       has_changes = false;
+      updateUnloadEvent();
       toggle_btns();
     }
     function humanFileSize(size) {
@@ -558,6 +573,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
             {
               current_file = filename;
               has_changes = false;
+              updateUnloadEvent();
               if (!disableedit)
                 editor.session.getUndoManager().markClean();
             }
@@ -592,7 +608,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       show_loading = true;
       $.post( url_script,
         { password: $("#password").val(), operation: "delete", file: $("#file").val() },
-        function( data ) { data = trygetdata(data, true); /*if (data.status=="ok") has_changes = true;*/ }
+        function( data ) { data = trygetdata(data, true); /*if (data.status=="ok") {has_changes = true;updateUnloadEvent();}*/ }
       );
       return false;
     }
