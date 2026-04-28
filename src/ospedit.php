@@ -353,16 +353,34 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       });
       initspinner();
     }
-    function beforeUnloadHandler(event) {
+    function beforeUnloadHandler(event)
+    {
       event.preventDefault();
       // Included for legacy support, e.g. Chrome/Edge < 119
       event.returnValue = true;
     }
-    function updateUnloadEvent() {
+    function updateUnloadEvent()
+    {
       if (has_changes)
         window.addEventListener("beforeunload", beforeUnloadHandler);
       else
         window.removeEventListener("beforeunload", beforeUnloadHandler);
+    }
+    function updateTitle()
+    {
+      let filename = current_file;
+      if (!filename.length) filename = 'PHPEdit';
+      else
+      {
+        let idslash = filename.lastIndexOf('/');
+        if (idslash>-1) {
+          filename = filename.substring(idslash+1);
+        }
+        if (has_changes)
+          filename += '*';
+        filename += ' (edit)';
+      }
+      document.title = filename;
     }
     function initeditor(mode)
     {
@@ -383,6 +401,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
         window.editor.on("input", function() {
           has_changes = !window.editor.session.getUndoManager().isClean();
           updateUnloadEvent();
+          updateTitle();
           toggle_btns();
         });
       }
@@ -534,6 +553,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
           if (data.status == "ok")
           {
             current_file = $("#file").val();//alert('loaded');
+            updateTitle();
             if (!disableedit) {
               editor.getSession().setValue(data.content);
               editor.focus();
@@ -574,6 +594,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
               current_file = filename;
               has_changes = false;
               updateUnloadEvent();
+              updateTitle();
               if (!disableedit)
                 editor.session.getUndoManager().markClean();
             }
@@ -608,7 +629,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       show_loading = true;
       $.post( url_script,
         { password: $("#password").val(), operation: "delete", file: $("#file").val() },
-        function( data ) { data = trygetdata(data, true); /*if (data.status=="ok") {has_changes = true;updateUnloadEvent();}*/ }
+        function( data ) { data = trygetdata(data, true); /*if (data.status=="ok") {has_changes = true;updateUnloadEvent();updateTitle();}*/ }
       );
       return false;
     }
