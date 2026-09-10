@@ -24,6 +24,7 @@ SOFTWARE.
 */
 header('Content-Type: text/html; charset=UTF-8');
 header("X-XSS-Protection: 0");
+const MAX_FILE_SIZE = 200000000;
 
 $url_script = "http".(!empty($_SERVER['HTTPS'])?"s":"")."://".$_SERVER['SERVER_NAME'].":".$_SERVER['SERVER_PORT'].$_SERVER['REQUEST_URI'];
 
@@ -45,6 +46,59 @@ if ($password != "###_YOUR_PASSWORD_HERE_###")
 </center>
 <?php
   exit(0);
+}
+
+function startsWith($string, $query) {
+  return substr($string, 0, strlen($query)) === $query;
+}
+
+if (isset($_FILES['userfile']['tmp_name'])) {
+  header('Content-Type: application/json; charset=utf-8');
+  if ((is_string($_FILES['userfile']['tmp_name']) && !is_file($_FILES['userfile']['tmp_name'])) || (is_array($_FILES['userfile']['tmp_name']) && count(array_filter($_FILES['userfile']['tmp_name'], function($e) {return is_file($e);}))<=0)) {
+    echo json_encode(["status"=>"ko", "message"=> "erreur durant l'upload du fichier \"".$_FILES['userfile']['tmp_name']."\""]);
+    die();
+  } else {
+    $force = isset($_POST['force']) && $_POST['force']==="true";
+    $files = $_FILES['userfile']['tmp_name'];
+    if (!is_array($files)) $files = array($files);
+    $i=0;
+    foreach ($files as $file) {
+      $filesize = @filesize($file);
+      if ($filesize > MAX_FILE_SIZE) {
+        header($_SERVER['SERVER_PROTOCOL'] . ' 500 Internal Server Error', true, 500);
+        echo json_encode(["status"=>"ko", "message"=> "fichier uploadé trop gros"]);
+        die();
+      }
+      if(isset($_POST['filename'][$i])) {
+        $fname = $_POST['filename'][$i];
+        /*$idxslash = strpos($fname, DIRECTORY_SEPARATOR);
+        if ($idxslash !== false) {
+          $fname = substr($fname, $idxslash+1);
+        }*/
+        //https://stackoverflow.com/a/2021729
+        $fname = mb_ereg_replace("([^\w\s\d\-_~,;\[\]\(\).\/])", '', $fname);
+        //$fname = mb_ereg_replace("([\.]{2,})", '', $fname);
+        if (strlen(trim($fname))>0) {
+          //if (!startsWith(realpath(dirname($fname)), realpath(dirname(__FILE__)))) {
+          //  echo json_encode(["status"=>"ko", "message"=> "chemin du fichier invalide"]);
+          //  die();
+          //}
+          if (file_exists($fname)) {
+            if ($force) {
+              unlink($fname);
+            } else {
+              echo json_encode(["status"=>"ko", "alreadyexists"=>true, "message"=> "le fichier ".$fname." existe déjà"]);
+              die();
+            }
+          }
+          rename($file, ".".DIRECTORY_SEPARATOR.$fname);
+        }
+        $i++;
+      }
+    }
+    echo json_encode(["status"=>"ok"]);
+    exit();
+  }
 }
 
 $file='';
@@ -279,6 +333,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     <script src="//cdnjs.cloudflare.com/ajax/libs/spin.js/2.3.2/spin.js" type="text/javascript" charset="utf-8"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js" type="text/javascript" charset="utf-8"></script>
     <script type="text/javascript">
+    const DIRECTORY_SEPARATOR = '<?php
+      echo (DIRECTORY_SEPARATOR == "\\")?"\\":DIRECTORY_SEPARATOR;
+    ?>';
     var editor = null;
     var disableedit = <?php echo $disableedit==TRUE?"true":"false";?>;
     var url_script = "<?php echo $url_script;?>";
@@ -376,10 +433,9 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
         if (idslash>-1) {
           filename = filename.substring(idslash+1);
         }
-        if (has_changes)
-          filename += '*';
         filename += ' (edit)';
       }
+      if (has_changes) filename = '*' + filename;
       document.title = filename;
     }
     function initeditor(mode)
@@ -462,7 +518,6 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     function initmodechooser() {
       window.modelist = window.modelist || ace.require("ace/ext/modelist");
       let modechooser = document.getElementById('modechooser');
-      let modechooserlbl = document.getElementById('modechooserlbl');
       modelist.modes.forEach(mode => {
         var opt = document.createElement('option');
         opt.value = mode.mode;
@@ -490,10 +545,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       $("#delbtn")[0].disabled = !is_file_selected || bdisable;
       $("#renbtn")[0].disabled = !is_file_selected || bdisable;
       if (bdisable || (disableedit || !is_file_selected)) {
-        modechooserlbl.classList.add('invisible');
         modechooser.classList.add('invisible');
       } else {
-        modechooserlbl.classList.remove('invisible');
         modechooser.classList.remove('invisible');
       }
     }
@@ -659,8 +712,108 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       );
       return false;
     }
+    async function doupload()
+    {
+      if (has_changes && !confirm("Warning, you have pending changes, are you sure?"))
+        return false;
+      $("#uploadbtn")[0].classList.add('disabled');
+      try {
+        let files = await browseForFile(true);
+        await handleFileSelect(files);
+      } catch(err) {
+        alert('Erreur durant la sélection du fichier!');
+        console.error(err);
+      }
+      $("#uploadbtn")[0].classList.remove('disabled');
+    }
+    async function handleFileSelect(files, force=false)
+    {
+      files = files || [];
+      if (!Array.isArray(files) && !(files instanceof FileList)) files = [files];
+      console.log(files);
+      let filename = $("#file").val();
+      let fpath = './';
+      let idxslash = filename.lastIndexOf(DIRECTORY_SEPARATOR);
+      if (idxslash > -1) {
+        fpath = filename.substring(0,idxslash+1);
+      }
+      let formData = new FormData();
+      
+      [...files].forEach((file, i) => {
+        const blob = new Blob([file], { type: "application/octet-stream" });
+        let fname = force ? file.name : prompt(`Entrez le nom du fichier n°${i+1}`, file.name);
+        if (!fname) return;
+        formData.append(`userfile[${i}]`, blob);
+        formData.append(`filename[${i}]`, fpath + (fname ?? file.name));
+      });
+
+      if (![...formData].length) return;
+
+      formData.append("force", force);
+      formData.append("password", $("#password").val());
+      try {
+        const req = await fetch('', {method: "POST", body: formData});
+        const ret = await req.json();
+        if (ret.status=='ok') {
+          if (confirm('Fichier uploadé ! Voulez vous l\'ouvrir en édition?')) {
+            $("#file").val(fpath + files[0].name);
+            doload();
+          }
+        } else {
+          if (ret.alreadyexists) {
+            if (confirm(`Le fichier existe déjà, voulez vous l'écraser?`))
+              await handleFileSelect(files, true);
+          } else {
+            alert(ret.message ?? "erreur inconnue");
+            console.error(ret);
+          }
+        }
+      } catch(err) {
+        alert('erreur à l\'upload');
+        console.log(err);
+      }
+    }
+    const browseForFile = (multiple=false, ext=null) => {
+      let lock = false
+      return new Promise((resolve, reject) => {
+        // create input file
+        const el = document.createElement('input');
+        el.id = +new Date();
+        el.style.display = 'none';
+        el.setAttribute('type', 'file');
+        if (multiple)
+          el.setAttribute('multiple', '');
+        if (typeof ext === 'string')
+          el.setAttribute('accept', ext);// accept=".gif,.jpg,.jpeg,.png,.doc,.docx"
+        document.body.appendChild(el)
+  
+        el.addEventListener('change', () => {
+          lock = true
+          resolve(el.files)
+          // remove dom
+          document.body.removeChild(document.getElementById(el.id))
+        }, { once: true });
+  
+        // open file select box
+        el.click();
+  
+        // file blur
+        window.addEventListener('focus', () => {
+          setTimeout(() => {
+            if (!lock && document.getElementById(el.id)) {
+              try {
+                //reject(new Error('onblur'))
+                resolve(null);
+                // remove dom
+                document.body.removeChild(document.getElementById(el.id))
+              } catch(err){resolve(null);}
+            }
+          }, 300);
+        }, { once: true })
+      })
+    }
   </script>
-    <style type="text/css">
+  <style type="text/css">
     input {
       display: inline;
     }
@@ -684,14 +837,19 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       left: 0px;
       right: 0px;
     }
-    @media (min-width:840px) {
+    @media (min-width:1101px) {
       .content {
       top: 40px;
       }
     }
-    @media (max-width:840px) {
+    @media (min-width:390px) and (max-width:1101px) {
       .content {
       top: 55px;
+      }
+    }
+    @media (max-width:390px) {
+      .content {
+      top: 75px;
       }
     }
     #message {
@@ -724,11 +882,16 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     .clickable {
       cursor: pointer;
     }
-    </style>
+    .disabled {
+      opacity: 0.5;
+      cursor: initial;
+    }
+  </style>
   </head>
   <body onload="Init();">
     <form id="formfile" name="formfile" method="post" action="<?php echo $url_script;?>" onsubmit="return false;">
       <input type="hidden" name="password" id="password" value="<?php echo $password;?>"/>
+      <span name="uploadbtn" id="uploadbtn" onclick="doupload()" title="upload" class="clickable">&#x1F4C2;</span>
       <input type="text" name="file" id="file" value="<?php echo $file;?>" autofocus/>
       <a id="filelink" href="<?php echo $file;?>" target="_blank"><?php echo $file;?></a>
       <button name="loadbtn" id="loadbtn" onclick="doload()" disabled>load</button>
@@ -737,7 +900,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       <button name="delbtn" id="delbtn" onclick="dodelete()" disabled>delete</button>
       <button name="renbtn" id="renbtn" onclick="dorename()" disabled>rename</button>
       <input type="checkbox" id="cb_wordwrap" class="clickable" title="word wrap" onchange="editor.session.setUseWrapMode(this.checked);"><label class="clickable" title="word wrap" for="cb_wordwrap">&#8626;</label>
-      <label id="modechooserlbl" for="modechooser" class="invisible">language : </label><select name="modechooser" id="modechooser" onchange="setmode(this.value)" class="invisible"></select>
+      <select name="modechooser" id="modechooser" onchange="setmode(this.value)" class="invisible"></select>
       <span id="loading" style="display:none;">Loading...</span>
       <span id="message"></span>
       <textarea class="content" name="content" id="content" cols="190" rows="35"><?php echo htmlspecialchars($content);?></textarea>
