@@ -518,6 +518,7 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     function initmodechooser() {
       window.modelist = window.modelist || ace.require("ace/ext/modelist");
       let modechooser = document.getElementById('modechooser');
+      //let modechooserlbl = document.getElementById('modechooserlbl');
       modelist.modes.forEach(mode => {
         var opt = document.createElement('option');
         opt.value = mode.mode;
@@ -545,8 +546,10 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
       $("#delbtn")[0].disabled = !is_file_selected || bdisable;
       $("#renbtn")[0].disabled = !is_file_selected || bdisable;
       if (bdisable || (disableedit || !is_file_selected)) {
+        //modechooserlbl.classList.add('invisible');
         modechooser.classList.add('invisible');
       } else {
+        //modechooserlbl.classList.remove('invisible');
         modechooser.classList.remove('invisible');
       }
     }
@@ -716,6 +719,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
     {
       if (has_changes && !confirm("Warning, you have pending changes, are you sure?"))
         return false;
+      toggle_btns(true);
+      $("#file")[0].disabled=true;
       $("#uploadbtn")[0].classList.add('disabled');
       try {
         let files = await browseForFile(true);
@@ -725,6 +730,8 @@ $disableedit = $disableedit=='1'?TRUE:FALSE;
         console.error(err);
       }
       $("#uploadbtn")[0].classList.remove('disabled');
+      $("#file")[0].disabled=false;
+      toggle_btns(false);
     }
     async function handleFileSelect(files, force=false)
     {
